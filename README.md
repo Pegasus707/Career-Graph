@@ -124,5 +124,12 @@ npm run dev
 
 ---
 
+## 👥 Contributors
+
+* [Sanika Vichare](https://github.com/sanikavichare45-sv) (`@sanikavichare45-sv`)
+* [Archit Surve](https://github.com/Pegasus707) (`@Pegasus707`)
+
+---
+
 ## 📝 License
 This project is open-source under the [MIT License](LICENSE).
