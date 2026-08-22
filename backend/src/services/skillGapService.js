@@ -6,7 +6,6 @@ const UserProfile = require('../models/UserProfile');
 
 const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
-// Counts total lessons across all Level documents belonging to a course.
 async function countCourseLessons(courseId) {
   const levels = await Level.find({ course: courseId });
   let total = 0;
@@ -17,7 +16,11 @@ async function countCourseLessons(courseId) {
 }
 
 async function buildRoadmap(userId, careerId) {
-  const career = await Career.findById(careerId).populate('requiredSkills.skill');
+  const career = await Career.findById(careerId).populate({
+    path: 'requiredSkills.skill',
+    populate: { path: 'prerequisites', select: '_id name slug' }
+  });
+
   if (!career) {
     const err = new Error('Career not found');
     err.statusCode = 404;
@@ -34,7 +37,9 @@ async function buildRoadmap(userId, careerId) {
     course: { $in: courses.map((c) => c._id) }
   });
 
-  const nodes = career.requiredSkills.map((req) => {
+  const totalReqs = career.requiredSkills.length;
+
+  const rawNodes = career.requiredSkills.map((req, index) => {
     const skill = req.skill;
     const userSkill = declaredSkills.find((s) => s.skill.toString() === skill._id.toString());
     const declaredLevel = userSkill ? userSkill.level : 0;
@@ -53,29 +58,124 @@ async function buildRoadmap(userId, careerId) {
 
     const percent = status === 'completed' ? 100 : courseProgress;
 
+    // Determine Phase
+    const ratio = index / Math.max(1, totalReqs);
+    let phaseId = 'foundations';
+    let phaseTitle = 'Phase 1: Foundations';
+    let phaseDesc = 'Essential prerequisites & fundamental skills';
+
+    if (ratio >= 0.35 && ratio < 0.70) {
+      phaseId = 'core';
+      phaseTitle = 'Phase 2: Core Stack';
+      phaseDesc = 'Primary development stack & daily tools';
+    } else if (ratio >= 0.70) {
+      phaseId = 'advanced';
+      phaseTitle = 'Phase 3: Advanced & Ecosystem';
+      phaseDesc = 'Architecture, optimization & production tooling';
+    }
+
     return {
       skillId: skill._id,
       name: skill.name,
       slug: skill.slug,
+      skillObj: skill,
       requiredLevel: req.requiredLevel,
       requiredLevelLabel: LEVEL_LABELS[req.requiredLevel],
       userLevel: declaredLevel,
       userLevelLabel: LEVEL_LABELS[declaredLevel],
       status,
       percent,
-      courseId: course ? course._id : null
+      courseId: course ? course._id : null,
+      phaseId,
+      phaseTitle,
+      orderIndex: index
     };
+  });
+
+  // Evaluate prerequisites & lock status
+  const nodes = rawNodes.map((node) => {
+    const explicitPrereqs = (node.skillObj.prerequisites || []).map((p) => (p._id || p).toString());
+
+    let unmet = [];
+
+    if (explicitPrereqs.length > 0) {
+      unmet = rawNodes.filter((n) => explicitPrereqs.includes(n.skillId.toString()) && n.status !== 'completed');
+    } else if (node.phaseId === 'core') {
+      const phase1Nodes = rawNodes.filter((n) => n.phaseId === 'foundations');
+      const hasCompletedFoundation = phase1Nodes.some((n) => n.status === 'completed');
+      if (!hasCompletedFoundation && phase1Nodes.length > 0) {
+        unmet = phase1Nodes.filter((n) => n.status !== 'completed');
+      }
+    } else if (node.phaseId === 'advanced') {
+      const phase2Nodes = rawNodes.filter((n) => n.phaseId === 'core');
+      const hasCompletedCore = phase2Nodes.some((n) => n.status === 'completed');
+      if (!hasCompletedCore && phase2Nodes.length > 0) {
+        unmet = phase2Nodes.filter((n) => n.status !== 'completed');
+      }
+    }
+
+    const isLocked = unmet.length > 0 && node.status !== 'completed';
+    const lockedReason = isLocked
+      ? `Requires completing: ${unmet.map((u) => u.name).slice(0, 2).join(', ')}`
+      : '';
+
+    // Remove internal reference
+    const { skillObj, ...cleanNode } = node;
+
+    return {
+      ...cleanNode,
+      isLocked,
+      unmetPrerequisites: unmet.map((u) => ({ skillId: u.skillId, name: u.name, slug: u.slug })),
+      lockedReason
+    };
+  });
+
+  // Group nodes into phases
+  const phaseMap = {
+    foundations: {
+      id: 'foundations',
+      title: 'Phase 1: Foundations',
+      description: 'Essential prerequisites & fundamental concepts',
+      nodes: []
+    },
+    core: {
+      id: 'core',
+      title: 'Phase 2: Core Stack',
+      description: 'Primary technologies & framework proficiency',
+      nodes: []
+    },
+    advanced: {
+      id: 'advanced',
+      title: 'Phase 3: Advanced & Ecosystem',
+      description: 'Architecture, testing, and production tooling',
+      nodes: []
+    }
+  };
+
+  nodes.forEach((n) => {
+    if (phaseMap[n.phaseId]) {
+      phaseMap[n.phaseId].nodes.push(n);
+    } else {
+      phaseMap.foundations.nodes.push(n);
+    }
+  });
+
+  const phases = Object.values(phaseMap).filter((p) => p.nodes.length > 0).map((p) => {
+    const completedCount = p.nodes.filter((n) => n.status === 'completed').length;
+    const pct = Math.round((completedCount / p.nodes.length) * 100);
+    return { ...p, completedCount, totalCount: p.nodes.length, percent: pct };
   });
 
   const overallProgress = nodes.length
     ? Math.round(nodes.reduce((sum, n) => sum + n.percent, 0) / nodes.length)
     : 0;
 
-  const recommended = nodes.find((n) => n.status !== 'completed') || null;
+  const recommended = nodes.find((n) => !n.isLocked && n.status !== 'completed') || null;
 
   return {
     career: { id: career._id, name: career.name, slug: career.slug, description: career.description },
     nodes,
+    phases,
     overallProgress,
     recommended
   };

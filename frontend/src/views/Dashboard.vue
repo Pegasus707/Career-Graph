@@ -84,16 +84,16 @@ onMounted(async () => {
   }
 });
 
-const completedCount = computed(() => data.value.nodes.filter((n) => n.status === 'completed').length);
-const inProgressCount = computed(() => data.value.nodes.filter((n) => n.status === 'in_progress').length);
-const notStartedCount = computed(() => data.value.nodes.filter((n) => n.status === 'not_started').length);
+const completedCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'completed').length);
+const inProgressCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'in_progress').length);
+const notStartedCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'not_started').length);
 
 const orderedRemaining = computed(() =>
-  data.value.nodes.filter((n) => n.status !== 'completed').slice(0, 4)
+  (data.value.nodes || []).filter((n) => n.status !== 'completed').slice(0, 4)
 );
 
 const chartData = computed(() =>
-  data.value.nodes.map((n) => ({ name: n.name, percent: n.percent, status: n.status }))
+  (data.value.nodes || []).map((n) => ({ name: n.name, percent: n.percent, status: n.status }))
 );
 
 function statusLabel(status) {

@@ -8,7 +8,7 @@
         <router-link to="/dashboard">Dashboard</router-link>
         <router-link to="/roadmap">Roadmap</router-link>
         <router-link to="/profile">Profile</router-link>
-        <button class="btn btn-ghost" @click="handleLogout">Log out</button>
+        <button class="btn btn-logout" @click="handleLogout">Log out</button>
       </nav>
       <nav v-else class="nav-links">
         <router-link to="/login">Log in</router-link>
@@ -60,11 +60,12 @@ function handleLogout() {
   align-items: center;
   gap: 1.5rem;
 }
-.nav-links a {
+.nav-links a:not(.btn) {
   color: var(--text-dim);
   font-weight: 500;
   font-size: 0.9rem;
 }
-.nav-links a.router-link-active { color: var(--accent); }
+.nav-links a:not(.btn).router-link-active { color: var(--accent); }
+.nav-links a.btn-primary { color: #ffffff; }
 .btn-sm { padding: 0.5rem 1.1rem; font-size: 0.85rem; }
 </style>

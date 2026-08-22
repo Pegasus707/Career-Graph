@@ -40,6 +40,21 @@ exports.updateOnboarding = async (req, res, next) => {
   }
 };
 
+exports.updateTargetCareer = async (req, res, next) => {
+  try {
+    const { careerId } = req.body;
+    const career = await Career.findById(careerId);
+    if (!career) return res.status(404).json({ message: 'Career not found' });
+
+    req.user.targetCareer = career._id;
+    await req.user.save();
+
+    res.json({ user: req.user.toSafeObject(), career });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getProfile = async (req, res, next) => {
   try {
     const profile = await UserProfile.findOne({ user: req.user._id }).populate('skills.skill', 'name slug');
