@@ -31,23 +31,42 @@ async function buildRoadmap(userId, careerId) {
   const declaredSkills = profile ? profile.skills : [];
 
   const skillIds = career.requiredSkills.map((r) => r.skill._id);
+  const skillIdStrings = career.requiredSkills
+    .map((r) => r.skillId || (r.skill && (r.skill.skillId || r.skill.slug)))
+    .filter(Boolean);
+
   const courses = await Course.find({ skill: { $in: skillIds } });
+  const courseIds = courses.map((c) => c._id);
+
+  // Skill-Centric Progress Tracking: match by course, skill ObjectId, or universal skillId string
   const courseProgressDocs = await CourseProgress.find({
     user: userId,
-    course: { $in: courses.map((c) => c._id) }
+    $or: [
+      { course: { $in: courseIds } },
+      { skill: { $in: skillIds } },
+      { skillId: { $in: skillIdStrings } }
+    ]
   });
 
   const totalReqs = career.requiredSkills.length;
 
   const rawNodes = career.requiredSkills.map((req, index) => {
     const skill = req.skill;
-    const userSkill = declaredSkills.find((s) => s.skill.toString() === skill._id.toString());
+    const userSkill = declaredSkills.find(
+      (s) => s.skill && s.skill.toString() === skill._id.toString()
+    );
     const declaredLevel = userSkill ? userSkill.level : 0;
 
     const course = courses.find((c) => c.skill.toString() === skill._id.toString());
-    const progressDoc = course
-      ? courseProgressDocs.find((p) => p.course.toString() === course._id.toString())
-      : null;
+    const universalId = skill.skillId || skill.slug;
+
+    // Resolve progress cross-track by course, skill ObjectId, or universal skillId
+    const progressDoc = courseProgressDocs.find(
+      (p) =>
+        (course && p.course && p.course.toString() === course._id.toString()) ||
+        (p.skill && p.skill.toString() === skill._id.toString()) ||
+        (p.skillId && (p.skillId === universalId || p.skillId === skill.slug))
+    );
     const courseProgress = progressDoc ? progressDoc.percent : 0;
 
     const effectiveLevel = courseProgress === 100 ? Math.max(declaredLevel, req.requiredLevel) : declaredLevel;
