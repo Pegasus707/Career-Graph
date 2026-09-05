@@ -9,9 +9,31 @@
             <h1>{{ data.career.name }} Roadmap</h1>
             <p>{{ data.overallProgress }}% complete — structured learning path with skill prerequisite locks.</p>
           </div>
-          <button type="button" class="btn btn-secondary btn-switch" @click="openCareerModal">
-            Switch / Choose Another Career &rarr;
-          </button>
+          <div class="header-actions">
+            <div class="view-mode-toggle">
+              <button
+                type="button"
+                class="btn-toggle-view"
+                :class="{ active: viewMode === 'canvas' }"
+                @click="setViewMode('canvas')"
+                title="Switch to interactive canvas node graph"
+              >
+                🗺️ Canvas Graph
+              </button>
+              <button
+                type="button"
+                class="btn-toggle-view"
+                :class="{ active: viewMode === 'flow' }"
+                @click="setViewMode('flow')"
+                title="Switch to structured phase flow"
+              >
+                📋 Phase Flow
+              </button>
+            </div>
+            <button type="button" class="btn btn-secondary btn-switch" @click="openCareerModal">
+              Switch / Choose Another Career &rarr;
+            </button>
+          </div>
         </div>
       </header>
 
@@ -24,97 +46,278 @@
         </div>
       </transition>
 
-      <div class="legend">
-        <span class="legend-item"><i class="dot dot-done"></i> Completed</span>
-        <span class="legend-item"><i class="dot dot-progress"></i> In progress</span>
-        <span class="legend-item"><i class="dot dot-todo"></i> Not started</span>
-        <span class="legend-item"><i class="dot dot-locked"></i> 🔒 Locked</span>
-      </div>
+      <!-- INTERACTIVE CANVAS GRAPH VIEW -->
+      <div v-if="viewMode === 'canvas'" class="canvas-view-container">
+        <!-- Floating HUD Controls -->
+        <div class="canvas-hud">
+          <div class="hud-left">
+            <div class="hud-group">
+              <button type="button" class="hud-btn" @click="zoomIn" title="Zoom In">+</button>
+              <span class="hud-zoom-val">{{ Math.round(zoom * 100) }}%</span>
+              <button type="button" class="hud-btn" @click="zoomOut" title="Zoom Out">−</button>
+            </div>
+            <button type="button" class="hud-btn hud-reset" @click="resetCanvasView" title="Center View & Reset Zoom">
+              ⟲ Center
+            </button>
+          </div>
+          <div class="hud-right">
+            <div class="hud-legend-bar">
+              <span class="hud-item"><i class="dot dot-done"></i> Done</span>
+              <span class="hud-item"><i class="dot dot-progress"></i> In progress</span>
+              <span class="hud-item"><i class="dot dot-todo"></i> Not started</span>
+              <span class="hud-item"><i class="dot dot-locked"></i> Locked</span>
+            </div>
+          </div>
+        </div>
 
-      <div class="graph-wrap">
-        <div class="graph-tree">
-          <div class="root-node">{{ data.career.name }}</div>
-          <div class="connector-v-main"></div>
+        <div
+          ref="canvasViewportRef"
+          class="canvas-viewport"
+          :class="{ 'is-panning': isDragging }"
+          @mousedown="onMouseDown"
+          @mousemove="onMouseMove"
+          @mouseup="onMouseUp"
+          @mouseleave="onMouseUp"
+          @wheel.prevent="onWheel"
+        >
+          <!-- Canvas Stage -->
+          <div
+            ref="canvasStageRef"
+            class="canvas-stage"
+            :style="{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '50% 50px'
+            }"
+          >
+            <!-- Dynamic SVG Bezier Connectors Layer -->
+            <svg class="canvas-svg-layer">
+              <defs>
+                <marker
+                  id="canvas-arrow"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1 L 9 5 L 0 9 z" fill="rgba(148, 163, 184, 0.45)" />
+                </marker>
+                <marker
+                  id="canvas-arrow-active"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1 L 9 5 L 0 9 z" fill="#6366f1" />
+                </marker>
+                <marker
+                  id="canvas-arrow-done"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1 L 9 5 L 0 9 z" fill="#10b981" />
+                </marker>
+              </defs>
 
-          <!-- Structured Phases Flow -->
-          <div class="phases-container">
-            <div
-              v-for="(phase, index) in (data.phases || [])"
-              :key="phase.id"
-              class="phase-section"
-            >
-              <!-- Phase Header Card -->
-              <div class="phase-header" :class="{ 'phase-locked': isPhaseLocked(index) }">
-                <div class="phase-title-group">
-                  <span class="phase-badge">Phase {{ index + 1 }}</span>
-                  <span v-if="isPhaseLocked(index)" class="phase-lock-pill">🔒 Locked</span>
-                  <h2 class="phase-title">{{ phase.title }}</h2>
+              <path
+                v-for="edge in computedEdges"
+                :key="edge.id"
+                :d="edge.d"
+                class="canvas-bezier-edge"
+                :class="{
+                  'edge-highlighted': edge.isHighlighted,
+                  'edge-dimmed': hoveredSkillId && !edge.isHighlighted,
+                  'edge-done': edge.isDone && !edge.isHighlighted
+                }"
+                :marker-end="edge.isHighlighted ? 'url(#canvas-arrow-active)' : (edge.isDone ? 'url(#canvas-arrow-done)' : 'url(#canvas-arrow)')"
+              />
+            </svg>
+
+            <!-- Canvas Root Career Node -->
+            <div id="canvas-node-root" class="canvas-root-badge">
+              <span class="root-badge-label">Target Career</span>
+              <h2>{{ data.career.name }}</h2>
+              <span class="root-badge-pct">{{ data.overallProgress }}% Mastered</span>
+            </div>
+
+            <!-- Canvas Phases Groups -->
+            <div class="canvas-phases-stage">
+              <div
+                v-for="(phase, pIndex) in (data.phases || [])"
+                :key="phase.id"
+                class="canvas-phase-group"
+                :class="{ 'phase-locked': isPhaseLocked(pIndex) }"
+              >
+                <!-- Phase Header -->
+                <div class="canvas-phase-header">
+                  <div class="canvas-phase-title-row">
+                    <span class="canvas-phase-pill">Phase {{ pIndex + 1 }}</span>
+                    <span v-if="isPhaseLocked(pIndex)" class="canvas-lock-badge">🔒 Locked</span>
+                    <h3>{{ phase.title }}</h3>
+                  </div>
+                  <span class="canvas-phase-progress">{{ phase.completedCount }} / {{ phase.totalCount }} Done</span>
                 </div>
-                <p class="phase-desc">
-                  {{ isPhaseLocked(index) ? (phase.lockedReason || `Complete all skills in Phase ${index} to unlock this phase`) : phase.description }}
-                </p>
-                <div class="phase-meta">
-                  <span class="phase-progress-text">{{ phase.completedCount }} of {{ phase.totalCount }} completed</span>
-                  <span class="phase-progress-pct">{{ phase.percent }}%</span>
-                </div>
-              </div>
 
-              <div class="connector-v-small"></div>
-
-              <!-- Phase Skill Branches -->
-              <div class="branches">
-                <div v-for="node in phase.nodes" :key="node.skillId" class="branch">
-                  <div class="connector-v"></div>
+                <!-- Phase Nodes Row -->
+                <div class="canvas-nodes-row">
                   <div
-                    class="skill-node"
+                    v-for="node in phase.nodes"
+                    :id="`canvas-node-${node.skillId}`"
+                    :key="node.skillId"
+                    class="canvas-skill-card"
                     :class="[
-                      statusClass(resolveNodeStatus(node), isNodeLocked(node, index)),
-                      { updating: updatingSkillId === node.skillId, 'node-is-locked': isNodeLocked(node, index) }
+                      statusClass(resolveNodeStatus(node), isNodeLocked(node, pIndex)),
+                      {
+                        'node-hovered': hoveredSkillId === node.skillId,
+                        'node-path-active': activePathSkillIds.has(node.skillId),
+                        'node-path-dimmed': hoveredSkillId && !activePathSkillIds.has(node.skillId),
+                        'node-is-locked': isNodeLocked(node, pIndex),
+                        updating: updatingSkillId === node.skillId
+                      }
                     ]"
-                    :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : ''"
-                    @contextmenu.prevent="openContextMenu($event, node, index)"
+                    @mouseenter="setHoveredSkill(node.skillId)"
+                    @mouseleave="clearHoveredSkill"
+                    @contextmenu.prevent="openContextMenu($event, node, pIndex)"
                   >
-                    <div class="skill-node-body" @click="handleNodeClick(node, index)">
-                      <div class="skill-node-header-row">
-                        <span v-if="isNodeLocked(node, index)" class="lock-icon" title="Locked skill">🔒</span>
-                        <span class="skill-node-name">{{ node.name }}</span>
+                    <div class="canvas-card-body" @click="handleNodeClick(node, pIndex)">
+                      <div class="canvas-card-top">
+                        <span v-if="isNodeLocked(node, pIndex)" class="canvas-card-lock">🔒</span>
+                        <span class="canvas-card-name">{{ node.name }}</span>
                       </div>
-                      <span class="skill-node-pct">
-                        {{ isNodeLocked(node, index) ? 'Locked' : (resolveNodeStatus(node) === 'completed' ? '100%' : `${node.percent}%`) }}
-                      </span>
+                      <div class="canvas-card-footer">
+                        <span class="canvas-card-pct">
+                          {{ isNodeLocked(node, pIndex) ? '' : (resolveNodeStatus(node) === 'completed' ? '100%' : `${node.percent}%`) }}
+                        </span>
+                        <button
+                          type="button"
+                          class="canvas-card-status-pill"
+                          :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, pIndex))"
+                          :disabled="updatingSkillId === node.skillId || isNodeLocked(node, pIndex)"
+                          @click.stop="handleQuickStatusClick(node, pIndex)"
+                          :title="isNodeLocked(node, pIndex) ? resolveLockedReason(node, pIndex) : 'Click to cycle status'"
+                        >
+                          <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
+                          <template v-else>
+                            <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
+                            <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
+                          </template>
+                        </button>
+                      </div>
                     </div>
-
-                    <button
-                      type="button"
-                      class="quick-status-btn"
-                      :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, index))"
-                      :disabled="updatingSkillId === node.skillId || isNodeLocked(node, index)"
-                      @click.stop="handleQuickStatusClick(node, index)"
-                      :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : 'Quick toggle status'"
-                    >
-                      <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
-                      <template v-else>
-                        <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
-                        <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
-                      </template>
-                    </button>
                   </div>
                 </div>
-              </div>
-
-              <!-- Vertical Connector between phases -->
-              <div v-if="index < data.phases.length - 1" class="phase-connector">
-                <div class="connector-v-long"></div>
-                <div class="connector-arrow">▼</div>
               </div>
             </div>
           </div>
         </div>
+
+        <p class="canvas-footer-hint">
+          💡 <strong>Canvas Tips:</strong> Drag background to pan • Scroll to zoom • Hover over a skill node to highlight its prerequisite path • Click node to slide out lesson drawer.
+        </p>
       </div>
 
-      <p class="tree-hint">
-        💡 <strong>Tip:</strong> Click any skill node to slide out the preview drawer. Right-click or use the button for quick status toggling.
-      </p>
+      <!-- STRUCTURED PHASE FLOW VIEW (Classic Mode) -->
+      <div v-else class="flow-view-container">
+        <div class="legend">
+          <span class="legend-item"><i class="dot dot-done"></i> Completed</span>
+          <span class="legend-item"><i class="dot dot-progress"></i> In progress</span>
+          <span class="legend-item"><i class="dot dot-todo"></i> Not started</span>
+          <span class="legend-item"><i class="dot dot-locked"></i> 🔒 Locked</span>
+        </div>
+
+        <div class="graph-wrap">
+          <div class="graph-tree">
+            <div class="root-node">{{ data.career.name }}</div>
+            <div class="connector-v-main"></div>
+
+            <!-- Structured Phases Flow -->
+            <div class="phases-container">
+              <div
+                v-for="(phase, index) in (data.phases || [])"
+                :key="phase.id"
+                class="phase-section"
+              >
+                <!-- Phase Header Card -->
+                <div class="phase-header" :class="{ 'phase-locked': isPhaseLocked(index) }">
+                  <div class="phase-title-group">
+                    <span class="phase-badge">Phase {{ index + 1 }}</span>
+                    <span v-if="isPhaseLocked(index)" class="phase-lock-pill">🔒 Locked</span>
+                    <h2 class="phase-title">{{ phase.title }}</h2>
+                  </div>
+                  <p class="phase-desc">
+                    {{ isPhaseLocked(index) ? (phase.lockedReason || `Complete all skills in Phase ${index} to unlock this phase`) : phase.description }}
+                  </p>
+                  <div class="phase-meta">
+                    <span class="phase-progress-text">{{ phase.completedCount }} of {{ phase.totalCount }} completed</span>
+                    <span class="phase-progress-pct">{{ phase.percent }}%</span>
+                  </div>
+                </div>
+
+                <div class="connector-v-small"></div>
+
+                <!-- Phase Skill Branches -->
+                <div class="branches">
+                  <div v-for="node in phase.nodes" :key="node.skillId" class="branch">
+                    <div class="connector-v"></div>
+                    <div
+                      class="skill-node"
+                      :class="[
+                        statusClass(resolveNodeStatus(node), isNodeLocked(node, index)),
+                        { updating: updatingSkillId === node.skillId, 'node-is-locked': isNodeLocked(node, index) }
+                      ]"
+                      :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : ''"
+                      @contextmenu.prevent="openContextMenu($event, node, index)"
+                    >
+                      <div class="skill-node-body" @click="handleNodeClick(node, index)">
+                        <div class="skill-node-header-row">
+                          <span v-if="isNodeLocked(node, index)" class="lock-icon" title="Locked skill">🔒</span>
+                          <span class="skill-node-name">{{ node.name }}</span>
+                        </div>
+                        <span class="skill-node-pct">
+                          {{ isNodeLocked(node, index) ? 'Locked' : (resolveNodeStatus(node) === 'completed' ? '100%' : `${node.percent}%`) }}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="quick-status-btn"
+                        :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, index))"
+                        :disabled="updatingSkillId === node.skillId || isNodeLocked(node, index)"
+                        @click.stop="handleQuickStatusClick(node, index)"
+                        :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : 'Quick toggle status'"
+                      >
+                        <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
+                        <template v-else>
+                          <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
+                          <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
+                        </template>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Vertical Connector between phases -->
+                <div v-if="index < data.phases.length - 1" class="phase-connector">
+                  <div class="connector-v-long"></div>
+                  <div class="connector-arrow">▼</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="tree-hint">
+          💡 <strong>Tip:</strong> Click any skill node to slide out the preview drawer. Right-click or use the button for quick status toggling.
+        </p>
+      </div>
     </template>
 
     <template v-else>
@@ -237,7 +440,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useRoadmapStore } from '../stores/roadmap';
 import { useUserStore } from '../stores/user';
@@ -259,6 +462,218 @@ const isDrawerOpen = ref(false);
 const isCareerModalOpen = ref(false);
 const filterStreamActive = ref(true);
 
+const viewMode = ref(localStorage.getItem('cg_roadmap_view') || 'canvas');
+
+// Canvas Pan & Zoom State
+const canvasViewportRef = ref(null);
+const canvasStageRef = ref(null);
+const zoom = ref(1);
+const pan = ref({ x: 0, y: 0 });
+const isDragging = ref(false);
+const dragStart = ref({ x: 0, y: 0 });
+
+// Hovered Skill ID for Upstream/Downstream tracing
+const hoveredSkillId = ref(null);
+const nodePositions = ref({});
+
+function setViewMode(mode) {
+  viewMode.value = mode;
+  localStorage.setItem('cg_roadmap_view', mode);
+  if (mode === 'canvas') {
+    nextTick(() => {
+      setTimeout(measureNodePositions, 80);
+    });
+  }
+}
+
+function zoomIn() {
+  zoom.value = Math.min(1.6, Math.round((zoom.value + 0.15) * 100) / 100);
+  nextTick(measureNodePositions);
+}
+
+function zoomOut() {
+  zoom.value = Math.max(0.45, Math.round((zoom.value - 0.15) * 100) / 100);
+  nextTick(measureNodePositions);
+}
+
+function resetCanvasView() {
+  zoom.value = 1;
+  pan.value = { x: 0, y: 0 };
+  nextTick(measureNodePositions);
+}
+
+function onWheel(e) {
+  const delta = e.deltaY < 0 ? 0.08 : -0.08;
+  zoom.value = Math.min(1.6, Math.max(0.45, Math.round((zoom.value + delta) * 100) / 100));
+  nextTick(measureNodePositions);
+}
+
+function onMouseDown(e) {
+  if (
+    e.target.closest('.canvas-skill-card') ||
+    e.target.closest('.canvas-hud') ||
+    e.target.closest('button')
+  ) {
+    return;
+  }
+  isDragging.value = true;
+  dragStart.value = {
+    x: e.clientX - pan.value.x,
+    y: e.clientY - pan.value.y
+  };
+}
+
+function onMouseMove(e) {
+  if (!isDragging.value) return;
+  pan.value = {
+    x: e.clientX - dragStart.value.x,
+    y: e.clientY - dragStart.value.y
+  };
+}
+
+function onMouseUp() {
+  isDragging.value = false;
+}
+
+function setHoveredSkill(skillId) {
+  hoveredSkillId.value = skillId;
+}
+
+function clearHoveredSkill() {
+  hoveredSkillId.value = null;
+}
+
+// Active path skills: Upstream prerequisites + Downstream dependents
+const activePathSkillIds = computed(() => {
+  if (!hoveredSkillId.value) return new Set();
+  const set = new Set([hoveredSkillId.value]);
+  const allNodes = data.value.nodes || [];
+
+  function walkUp(id) {
+    const node = allNodes.find((n) => n.skillId?.toString() === id?.toString());
+    if (node && node.prerequisites) {
+      node.prerequisites.forEach((p) => {
+        if (!set.has(p.skillId)) {
+          set.add(p.skillId);
+          walkUp(p.skillId);
+        }
+      });
+    }
+  }
+
+  function walkDown(id) {
+    allNodes.forEach((n) => {
+      const isDep = (n.prerequisites || []).some((p) => p.skillId?.toString() === id?.toString());
+      if (isDep && !set.has(n.skillId)) {
+        set.add(n.skillId);
+        walkDown(n.skillId);
+      }
+    });
+  }
+
+  walkUp(hoveredSkillId.value);
+  walkDown(hoveredSkillId.value);
+  return set;
+});
+
+function measureNodePositions() {
+  if (!canvasStageRef.value || viewMode.value !== 'canvas') return;
+  const stageBox = canvasStageRef.value.getBoundingClientRect();
+  const z = zoom.value || 1;
+  const posMap = {};
+
+  const rootEl = document.getElementById('canvas-node-root');
+  if (rootEl) {
+    const box = rootEl.getBoundingClientRect();
+    posMap['root'] = {
+      x: (box.left - stageBox.left + box.width / 2) / z,
+      yBottom: (box.bottom - stageBox.top) / z,
+      yTop: (box.top - stageBox.top) / z
+    };
+  }
+
+  (data.value.nodes || []).forEach((node) => {
+    const el = document.getElementById(`canvas-node-${node.skillId}`);
+    if (el) {
+      const box = el.getBoundingClientRect();
+      posMap[node.skillId] = {
+        x: (box.left - stageBox.left + box.width / 2) / z,
+        yBottom: (box.bottom - stageBox.top) / z,
+        yTop: (box.top - stageBox.top) / z
+      };
+    }
+  });
+
+  nodePositions.value = posMap;
+}
+
+const computedEdges = computed(() => {
+  if (viewMode.value !== 'canvas') return [];
+  const pos = nodePositions.value;
+  if (!pos || Object.keys(pos).length === 0) return [];
+
+  const edges = [];
+  const allNodes = data.value.nodes || [];
+  const nodeMap = {};
+  allNodes.forEach((n) => {
+    nodeMap[n.skillId] = n;
+  });
+
+  allNodes.forEach((node) => {
+    const toPos = pos[node.skillId];
+    if (!toPos) return;
+
+    const prereqs = node.prerequisites || [];
+    let hasDrawnExplicit = false;
+
+    prereqs.forEach((prereq) => {
+      const fromPos = pos[prereq.skillId];
+      if (fromPos) {
+        hasDrawnExplicit = true;
+        const isHighlighted =
+          activePathSkillIds.value.has(prereq.skillId) &&
+          activePathSkillIds.value.has(node.skillId);
+        const isDone =
+          isNodeCompleted(nodeMap[prereq.skillId]) && isNodeCompleted(node);
+
+        const deltaY = Math.max(30, Math.abs(toPos.yTop - fromPos.yBottom) * 0.5);
+        const pathD = `M ${fromPos.x} ${fromPos.yBottom} C ${fromPos.x} ${fromPos.yBottom + deltaY}, ${toPos.x} ${toPos.yTop - deltaY}, ${toPos.x} ${toPos.yTop}`;
+
+        edges.push({
+          id: `${prereq.skillId}->${node.skillId}`,
+          fromId: prereq.skillId,
+          toId: node.skillId,
+          d: pathD,
+          isHighlighted,
+          isDone
+        });
+      }
+    });
+
+    if (!hasDrawnExplicit && node.phaseId === 'foundations' && pos['root']) {
+      const fromPos = pos['root'];
+      const isHighlighted =
+        hoveredSkillId.value === node.skillId ||
+        activePathSkillIds.value.has(node.skillId);
+      const isDone = isNodeCompleted(node);
+
+      const deltaY = Math.max(25, Math.abs(toPos.yTop - fromPos.yBottom) * 0.5);
+      const pathD = `M ${fromPos.x} ${fromPos.yBottom} C ${fromPos.x} ${fromPos.yBottom + deltaY}, ${toPos.x} ${toPos.yTop - deltaY}, ${toPos.x} ${toPos.yTop}`;
+
+      edges.push({
+        id: `root->${node.skillId}`,
+        fromId: 'root',
+        toId: node.skillId,
+        d: pathD,
+        isHighlighted,
+        isDone
+      });
+    }
+  });
+
+  return edges;
+});
+
 const contextMenu = reactive({
   visible: false,
   x: 0,
@@ -269,12 +684,29 @@ const contextMenu = reactive({
 async function loadRoadmapData() {
   try {
     await roadmapStore.fetchRoadmap(route.params.careerId);
+    await nextTick();
+    setTimeout(measureNodePositions, 100);
   } catch (err) {
     console.error('Failed to load roadmap data:', err);
   }
 }
 
-onMounted(loadRoadmapData);
+onMounted(() => {
+  loadRoadmapData();
+  window.addEventListener('resize', measureNodePositions);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', measureNodePositions);
+});
+
+watch(
+  () => data.value,
+  () => {
+    nextTick(() => setTimeout(measureNodePositions, 100));
+  },
+  { deep: true }
+);
 
 function triggerToast(msg) {
   toastMessage.value = msg;
@@ -490,10 +922,486 @@ function badgeClass(status, isLocked) {
   gap: 1.5rem;
   flex-wrap: wrap;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.view-mode-toggle {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.btn-toggle-view {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-toggle-view:hover {
+  color: var(--text);
+}
+
+.btn-toggle-view.active {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
 .btn-switch {
   white-space: nowrap;
   font-size: 0.85rem;
   padding: 0.55rem 1rem;
+}
+
+/* ==========================================================================
+   CANVAS GRAPH VIEW STYLES
+   ========================================================================== */
+.canvas-view-container {
+  margin-top: 1.5rem;
+  position: relative;
+}
+
+.canvas-viewport {
+  position: relative;
+  width: 100%;
+  height: 740px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  overflow: hidden;
+  background-color: #f8fafc;
+  background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.05), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.canvas-viewport.is-panning {
+  cursor: grabbing;
+}
+
+.canvas-hud {
+  position: absolute;
+  top: 1.1rem;
+  left: 1.25rem;
+  right: 1.25rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hud-right {
+  display: flex;
+  align-items: center;
+}
+
+.hud-group {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 3px;
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.hud-btn {
+  background: transparent;
+  border: none;
+  color: #334155;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.hud-btn:hover {
+  background: #f1f5f9;
+  color: var(--accent);
+}
+
+.hud-reset {
+  width: auto;
+  padding: 0 0.9rem;
+  height: 38px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-reset:hover {
+  background: #f8fafc;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hud-zoom-val {
+  min-width: 46px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hud-legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  color: #334155;
+  font-weight: 600;
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.hud-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.canvas-footer-hint {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 0.85rem;
+  text-align: center;
+}
+
+.canvas-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 2rem 6rem;
+  will-change: transform;
+}
+
+.canvas-svg-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.canvas-bezier-edge {
+  fill: none;
+  stroke: #cbd5e1;
+  stroke-width: 2.2px;
+  transition: stroke 0.25s ease, stroke-width 0.25s ease, opacity 0.25s ease;
+}
+
+.canvas-bezier-edge.edge-done {
+  stroke: #10b981;
+  stroke-width: 2.5px;
+}
+
+.canvas-bezier-edge.edge-highlighted {
+  stroke: #6366f1;
+  stroke-width: 3.5px;
+  stroke-dasharray: 8 5;
+  animation: flowDash 0.9s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.6));
+}
+
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+.canvas-bezier-edge.edge-dimmed {
+  opacity: 0.15;
+}
+
+/* Canvas Root Badge */
+.canvas-root-badge {
+  position: relative;
+  z-index: 2;
+  background: #ffffff;
+  border: 2px solid #6366f1;
+  border-radius: 16px;
+  padding: 0.9rem 2.2rem;
+  text-align: center;
+  box-shadow: 0 8px 30px -4px rgba(99, 102, 241, 0.18), 0 0 0 4px rgba(99, 102, 241, 0.06);
+  margin-bottom: 2.8rem;
+}
+
+.root-badge-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  color: #6366f1;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.canvas-root-badge h2 {
+  font-size: 1.35rem;
+  margin: 0 0 0.35rem;
+  color: #0f172a;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.root-badge-pct {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: #4338ca;
+  background: #eef2ff;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* Canvas Phases Stage */
+.canvas-phases-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5rem;
+  width: 100%;
+  max-width: 1100px;
+  position: relative;
+  z-index: 2;
+}
+
+.canvas-phase-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.35rem 1.75rem 1.6rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+
+.canvas-phase-group.phase-locked {
+  background: rgba(248, 250, 252, 0.75);
+  border-style: dashed;
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.canvas-phase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.85rem;
+}
+
+.canvas-phase-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.canvas-phase-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #e0e7ff;
+}
+
+.canvas-lock-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #e11d48;
+  background: #ffe4e6;
+  border: 1px solid #fecdd3;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.canvas-phase-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e293b;
+}
+
+.canvas-phase-progress {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+}
+
+/* Canvas Nodes Row */
+.canvas-nodes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+/* Canvas Skill Card */
+.canvas-skill-card {
+  width: 215px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px -1px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.25s ease;
+}
+
+.canvas-skill-card:hover {
+  transform: translateY(-4px);
+  border-color: #6366f1;
+  box-shadow: 0 12px 24px -4px rgba(99, 102, 241, 0.2);
+}
+
+.canvas-skill-card.node-hovered,
+.canvas-skill-card.node-path-active {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #6366f1, 0 8px 24px rgba(99, 102, 241, 0.25);
+  transform: translateY(-4px);
+}
+
+.canvas-skill-card.node-path-dimmed {
+  opacity: 0.35;
+}
+
+.canvas-skill-card.node-done {
+  border-color: #10b981;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.canvas-skill-card.node-progress {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+}
+
+.canvas-skill-card.node-is-locked {
+  opacity: 0.7;
+  border-style: dashed;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.canvas-card-body {
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.canvas-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.canvas-card-lock {
+  font-size: 0.85rem;
+}
+
+.canvas-card-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.canvas-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.45rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.canvas-card-pct {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.canvas-card-status-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.canvas-card-status-pill:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: scale(1.04);
 }
 
 .toast-lock-banner {

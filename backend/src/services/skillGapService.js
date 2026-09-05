@@ -100,14 +100,9 @@ async function buildRoadmap(userId, careerId) {
     if (isCompleted) {
       status = 'completed';
       percent = 100;
-    } else if (declaredLevel === 2) {
-      // 'Know a little basics'
+    } else if (declaredLevel > 0 || courseProgress > 0) {
       status = 'in_progress';
-      percent = Math.max(50, courseProgress);
-    } else if (declaredLevel === 1 || courseProgress > 0) {
-      // 'Beginner' or started course lessons
-      status = 'in_progress';
-      percent = Math.max(25, courseProgress);
+      percent = courseProgress; // Starts at 0% and tracks genuine lesson completion
     }
 
     // Determine Phase from Career requirement schema, fallback to index ratio
@@ -176,6 +171,11 @@ async function buildRoadmap(userId, careerId) {
     return {
       ...cleanNode,
       isLocked,
+      prerequisites: (node.skillObj?.prerequisites || []).map((p) => ({
+        skillId: (p._id || p).toString(),
+        name: p.name,
+        slug: p.slug
+      })),
       unmetPrerequisites: unmet.map((u) => ({ skillId: u.skillId, name: u.name, slug: u.slug })),
       lockedReason
     };

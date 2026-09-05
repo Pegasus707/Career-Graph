@@ -210,18 +210,17 @@ exports.setSkillStatus = async (req, res, next) => {
     } else if (targetStatus === 'in_progress') {
       const lessonIds = allLessons.map((l) => l.lessonId);
       await LessonProgress.deleteMany({ user: userId, lesson: { $in: lessonIds } });
-      if (allLessons.length > 0) {
-        await LessonProgress.create({
-          user: userId,
-          lesson: allLessons[0].lessonId,
-          level: allLessons[0].levelId,
-          course: course._id,
+      await CourseProgress.findOneAndUpdate(
+        { user: userId, course: course._id },
+        {
+          percent: 0,
+          completedLessonCount: 0,
+          totalLessonCount: allLessons.length,
           skill: skill._id,
-          skillId: skillIdStr,
-          completedAt: new Date()
-        });
-      }
-      await recalculateCourseProgress(userId, course._id);
+          skillId: skillIdStr
+        },
+        { upsert: true }
+      );
       let profile = await UserProfile.findOne({ user: userId });
       if (!profile) profile = new UserProfile({ user: userId, skills: [] });
       const existingIndex = profile.skills.findIndex(
