@@ -9,8 +9,9 @@ const resourceSchema = new mongoose.Schema({
 }, { _id: false });
 
 const skillSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  slug: { type: String, required: true, unique: true },
+  skillId: { type: String, required: true, unique: true, trim: true },
+  name: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
   category: String,
   description: String,
   whyItMatters: String,
@@ -19,6 +20,7 @@ const skillSchema = new mongoose.Schema({
   prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
   relatedSkills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
   resources: [resourceSchema]
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Skill', skillSchema);
+

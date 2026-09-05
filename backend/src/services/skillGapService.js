@@ -58,24 +58,23 @@ async function buildRoadmap(userId, careerId) {
 
     const percent = status === 'completed' ? 100 : courseProgress;
 
-    // Determine Phase
+    // Determine Phase from Career requirement schema, fallback to index ratio
     const ratio = index / Math.max(1, totalReqs);
-    let phaseId = 'foundations';
+    const phaseId = req.phase || (ratio < 0.35 ? 'foundations' : ratio < 0.70 ? 'core' : 'advanced');
     let phaseTitle = 'Phase 1: Foundations';
     let phaseDesc = 'Essential prerequisites & fundamental skills';
 
-    if (ratio >= 0.35 && ratio < 0.70) {
-      phaseId = 'core';
+    if (phaseId === 'core') {
       phaseTitle = 'Phase 2: Core Stack';
       phaseDesc = 'Primary development stack & daily tools';
-    } else if (ratio >= 0.70) {
-      phaseId = 'advanced';
+    } else if (phaseId === 'advanced') {
       phaseTitle = 'Phase 3: Advanced & Ecosystem';
       phaseDesc = 'Architecture, optimization & production tooling';
     }
 
     return {
       skillId: skill._id,
+      explicitSkillId: skill.skillId || skill.slug,
       name: skill.name,
       slug: skill.slug,
       skillObj: skill,

@@ -1,4 +1,11 @@
 require('dotenv').config();
+const dns = require('dns');
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {
+  // Fallback if setServers is restricted
+}
+
 const mongoose = require('mongoose');
 const Skill = require('../models/Skill');
 const Career = require('../models/Career');
@@ -10,8 +17,20 @@ const UserProfile = require('../models/UserProfile');
 const { skillsData, careersData } = require('./seedData');
 
 async function run() {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected to MongoDB. Clearing existing content...');
+  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/careergraph';
+  try {
+    await mongoose.connect(uri);
+    console.log(`Connected to MongoDB via ${uri.startsWith('mongodb+srv') ? 'Atlas' : 'direct connection'}`);
+  } catch (err) {
+    if (uri !== 'mongodb://127.0.0.1:27017/careergraph') {
+      console.warn(`Primary MongoDB connection failed (${err.message}). Connecting to local MongoDB at mongodb://127.0.0.1:27017/careergraph...`);
+      await mongoose.connect('mongodb://127.0.0.1:27017/careergraph');
+      console.log('Connected to local MongoDB');
+    } else {
+      throw err;
+    }
+  }
+  console.log('Clearing existing content...');
   await Promise.all([
     Skill.deleteMany({}),
     Career.deleteMany({}),
@@ -25,6 +44,7 @@ async function run() {
   const skillMap = {};
   for (const s of skillsData) {
     const skill = await Skill.create({
+      skillId: s.skillId || `skill-${s.slug}`,
       name: s.name,
       slug: s.slug,
       category: s.category,
@@ -55,12 +75,15 @@ async function run() {
     for (const levelName of ['Beginner', 'Intermediate', 'Advanced']) {
       await Level.create({
         course: course._id,
+        skill: skill._id,
+        skillId: skill.skillId,
+        slug: skill.slug,
         name: levelName,
         order: levelOrder[levelName],
         modules: [
           {
             title: `${s.name} — ${levelName}`,
-            lessons: s.topics[levelName].map((topic) => ({
+            lessons: (s.topics[levelName] || []).map((topic) => ({
               title: topic,
               content:
                 `In this lesson you'll learn about "${topic}" in ${s.name}. Work through the explanation, ` +
@@ -81,7 +104,15 @@ async function run() {
       slug: c.slug,
       category: c.category,
       description: c.description,
-      requiredSkills: c.requiredSkills.map((r) => ({ skill: skillMap[r.slug]._id, requiredLevel: r.level }))
+      streams: c.streams || [],
+      degrees: c.degrees || [],
+      requiredSkills: c.requiredSkills.map((r) => ({
+        skill: skillMap[r.slug]._id,
+        skillId: skillMap[r.slug].skillId,
+        slug: r.slug,
+        requiredLevel: r.level,
+        phase: r.phase || 'foundations'
+      }))
     });
   }
   console.log(`Created ${careersData.length} careers.`);
