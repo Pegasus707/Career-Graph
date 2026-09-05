@@ -1,6 +1,15 @@
 <template>
   <main class="container dashboard">
-    <div v-if="loading" class="loading">Loading your dashboard…</div>
+    <div v-if="roadmapStore.loading" class="loading">
+      <span class="loading-spinner"></span>
+      <p>Loading your dashboard…</p>
+    </div>
+
+    <div v-else-if="roadmapStore.error" class="card error-card">
+      <h2>Something went wrong</h2>
+      <p>{{ roadmapStore.error }}</p>
+      <button class="btn btn-secondary" @click="roadmapStore.fetchDashboardProgress()">Retry</button>
+    </div>
 
     <template v-else-if="data.career">
       <header class="dash-header">
@@ -65,25 +74,24 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import api from '../services/api';
+import { computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
+import { useRoadmapStore } from '../stores/roadmap';
 import ProgressBar from '../components/ProgressBar.vue';
 import SkillProgressChart from '../components/SkillProgressChart.vue';
 
 const auth = useAuthStore();
-const loading = ref(true);
-const data = ref({ career: null, nodes: [], overallProgress: 0 });
+const roadmapStore = useRoadmapStore();
 
 onMounted(async () => {
   try {
-    const { data: res } = await api.get('/progress');
-    data.value = res;
-  } finally {
-    loading.value = false;
+    await roadmapStore.fetchDashboardProgress();
+  } catch (e) {
+    // Handled in store
   }
 });
 
+const data = computed(() => roadmapStore.roadmap);
 const completedCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'completed').length);
 const inProgressCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'in_progress').length);
 const notStartedCount = computed(() => (data.value.nodes || []).filter((n) => n.status === 'not_started').length);

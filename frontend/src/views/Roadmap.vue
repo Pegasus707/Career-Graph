@@ -198,23 +198,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import api from '../services/api';
+import { useRoadmapStore } from '../stores/roadmap';
+import { useUserStore } from '../stores/user';
 import SkillPreviewDrawer from '../components/SkillPreviewDrawer.vue';
 
 const route = useRoute();
-const loading = ref(true);
-const updatingSkillId = ref(null);
+const roadmapStore = useRoadmapStore();
+const userStore = useUserStore();
+
 const toastMessage = ref('');
-const data = ref({ career: null, nodes: [], phases: [], overallProgress: 0 });
+const data = computed(() => roadmapStore.roadmap);
+const loading = computed(() => roadmapStore.loading);
+const updatingSkillId = computed(() => roadmapStore.updatingSkillId);
+const careers = computed(() => roadmapStore.careers);
+const loadingCareers = computed(() => roadmapStore.loadingCareers);
 
 const selectedSkillSlug = ref('');
 const isDrawerOpen = ref(false);
-
 const isCareerModalOpen = ref(false);
-const loadingCareers = ref(false);
-const careers = ref([]);
 
 const contextMenu = reactive({
   visible: false,
@@ -225,13 +228,9 @@ const contextMenu = reactive({
 
 async function loadRoadmapData() {
   try {
-    const url = route.params.careerId ? `/roadmap/${route.params.careerId}` : '/roadmap';
-    const { data: res } = await api.get(url);
-    data.value = res;
+    await roadmapStore.fetchRoadmap(route.params.careerId);
   } catch (err) {
     console.error('Failed to load roadmap data:', err);
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -263,14 +262,13 @@ function handleQuickStatusClick(node) {
 async function openCareerModal() {
   isCareerModalOpen.value = true;
   if (!careers.value.length) {
-    loadingCareers.value = true;
     try {
-      const { data: res } = await api.get('/careers');
-      careers.value = res.careers || res || [];
+      await roadmapStore.fetchCareers({
+        stream: userStore.userStream,
+        degree: userStore.userDegree
+      });
     } catch (err) {
       console.error('Failed to load careers:', err);
-    } finally {
-      loadingCareers.value = false;
     }
   }
 }
@@ -284,16 +282,12 @@ async function selectCareer(careerId) {
     closeCareerModal();
     return;
   }
-  loading.value = true;
   try {
-    await api.put('/users/target-career', { careerId });
-    const { data: res } = await api.get(`/roadmap/${careerId}`);
-    data.value = res;
+    await userStore.updateTargetCareer(careerId);
+    await roadmapStore.fetchRoadmap(careerId);
     closeCareerModal();
   } catch (err) {
     console.error('Failed to update target career:', err);
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -323,15 +317,12 @@ async function cycleStatus(node) {
 
 async function setStatus(node, targetStatus) {
   if (updatingSkillId.value) return;
-  updatingSkillId.value = node.skillId;
   try {
-    const { data: updatedRoadmap } = await api.put(`/progress/skill/${node.skillId}/status`, { targetStatus });
-    data.value = updatedRoadmap;
+    await roadmapStore.setSkillStatus(node.skillId, targetStatus);
   } catch (err) {
-    const msg = err.response?.data?.message || 'Failed to update skill status';
+    const msg = roadmapStore.error || err.response?.data?.message || 'Failed to update skill status';
     triggerToast(`🔒 ${msg}`);
   } finally {
-    updatingSkillId.value = null;
     closeContextMenu();
   }
 }
@@ -358,6 +349,7 @@ function selectMenuStatus(targetStatus) {
     setStatus(contextMenu.node, targetStatus);
   }
 }
+
 
 function statusClass(status, isLocked) {
   if (isLocked) return 'node-locked';

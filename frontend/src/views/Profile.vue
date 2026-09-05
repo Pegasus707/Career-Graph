@@ -2,65 +2,77 @@
   <main class="container profile-page">
     <h1>Profile</h1>
 
-    <section class="card">
-      <h2>{{ auth.user?.name }}</h2>
-      <p>{{ auth.user?.email }}</p>
-    </section>
+    <div v-if="userStore.loading" class="loading">
+      <span class="loading-spinner"></span>
+      <p>Loading profile…</p>
+    </div>
 
-    <section class="card" v-if="!loading">
-      <h2>Education</h2>
-      <p>
-        {{ profileData.profile.education?.degree || 'Not set' }}
-        <span v-if="profileData.profile.education?.field"> in {{ profileData.profile.education.field }}</span>
-        <span v-if="profileData.profile.education?.gradYear"> · Class of {{ profileData.profile.education.gradYear }}</span>
-      </p>
+    <div v-else-if="userStore.error" class="card error-card">
+      <p>{{ userStore.error }}</p>
+      <button class="btn btn-secondary" @click="loadProfile">Retry</button>
+    </div>
 
-      <h2 style="margin-top: 1.5rem;">Current status</h2>
-      <p>
-        {{ statusLabel(profileData.profile.status) }}
-        <span v-if="profileData.profile.jobTitle"> — {{ profileData.profile.jobTitle }}</span>
-      </p>
-    </section>
+    <template v-else>
+      <section class="card">
+        <h2>{{ auth.user?.name }}</h2>
+        <p>{{ auth.user?.email }}</p>
+      </section>
 
-    <section class="card" v-if="!loading && profileData.targetCareer">
-      <h2>Target career</h2>
-      <p>{{ profileData.targetCareer.name }} — {{ roadmap.overallProgress }}% complete</p>
+      <section class="card">
+        <h2>Education</h2>
+        <p>
+          {{ userStore.profile.education?.degree || 'Not set' }}
+          <span v-if="userStore.profile.education?.field"> in {{ userStore.profile.education.field }}</span>
+          <span v-if="userStore.profile.education?.gradYear"> · Class of {{ userStore.profile.education.gradYear }}</span>
+        </p>
 
-      <h3 style="margin-top: 1rem; font-size: 0.95rem;">Declared skills</h3>
-      <ul class="skill-list" v-if="profileData.skills.length">
-        <li v-for="s in profileData.skills" :key="s.skill._id">
-          {{ s.skill.name }}: <strong>{{ levelLabel(s.level) }}</strong>
-        </li>
-      </ul>
-      <p v-else>No skills declared yet.</p>
-    </section>
+        <h2 style="margin-top: 1.5rem;">Current status</h2>
+        <p>
+          {{ statusLabel(userStore.profile.status) }}
+          <span v-if="userStore.profile.jobTitle"> — {{ userStore.profile.jobTitle }}</span>
+        </p>
+      </section>
 
-    <router-link to="/onboarding" class="btn btn-secondary">Update onboarding info</router-link>
+      <section class="card" v-if="userStore.targetCareer">
+        <h2>Target career</h2>
+        <p>{{ userStore.targetCareer.name }} — {{ roadmapStore.overallProgress }}% complete</p>
+
+        <h3 style="margin-top: 1rem; font-size: 0.95rem;">Declared skills</h3>
+        <ul class="skill-list" v-if="userStore.declaredSkills.length">
+          <li v-for="s in userStore.declaredSkills" :key="s.skill?._id || s.skill">
+            {{ s.skill?.name || s.skill }}: <strong>{{ levelLabel(s.level) }}</strong>
+          </li>
+        </ul>
+        <p v-else>No skills declared yet.</p>
+      </section>
+
+      <router-link to="/onboarding" class="btn btn-secondary">Update onboarding info</router-link>
+    </template>
   </main>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import api from '../services/api';
+import { useUserStore } from '../stores/user';
+import { useRoadmapStore } from '../stores/roadmap';
 
 const auth = useAuthStore();
-const loading = ref(true);
-const profileData = ref({ profile: {}, skills: [], targetCareer: null });
-const roadmap = ref({ overallProgress: 0 });
+const userStore = useUserStore();
+const roadmapStore = useRoadmapStore();
 
-onMounted(async () => {
+async function loadProfile() {
   try {
-    const { data } = await api.get('/users/profile');
-    profileData.value = data;
+    const data = await userStore.fetchProfile();
     if (data.targetCareer) {
-      const { data: r } = await api.get('/progress');
-      roadmap.value = r;
+      await roadmapStore.fetchDashboardProgress();
     }
-  } finally {
-    loading.value = false;
+  } catch (err) {
+    // Handled in stores
   }
-});
+}
+
+onMounted(loadProfile);
 
 const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
 function levelLabel(n) {

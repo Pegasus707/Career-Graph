@@ -104,7 +104,12 @@
         <h2>What do you want to become?</h2>
         <p>We'll compare this career's required skills against what you already know.</p>
 
-        <div class="option-grid">
+        <div v-if="roadmapStore.loadingCareers" class="loading-box">
+          <span class="loading-spinner"></span>
+          <p>Loading matching career tracks…</p>
+        </div>
+
+        <div v-else class="option-grid">
           <button
             v-for="c in careers"
             :key="c._id"
@@ -142,16 +147,25 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
+import { useUserStore } from '../stores/user';
+import { useRoadmapStore } from '../stores/roadmap';
 
 const router = useRouter();
 const auth = useAuthStore();
+const userStore = useUserStore();
+const roadmapStore = useRoadmapStore();
 
 const step = ref(1);
 const loading = ref(false);
 const error = ref('');
 
 // Step 1
-const education = ref({ degree: '', field: '', gradYear: null, stillStudying: false });
+const education = ref({
+  degree: userStore.userDegree || '',
+  field: userStore.userStream || '',
+  gradYear: null,
+  stillStudying: false
+});
 
 // Step 2
 const status = ref('');
@@ -189,13 +203,19 @@ function removeSkill(id) {
 }
 
 // Step 4
-const careers = ref([]);
+const careers = computed(() => roadmapStore.careers);
 const targetCareer = ref('');
 
 onMounted(async () => {
-  const [skillsRes, careersRes] = await Promise.all([api.get('/skills'), api.get('/careers')]);
-  allSkills.value = skillsRes.data.skills;
-  careers.value = careersRes.data.careers;
+  try {
+    const [skillsRes] = await Promise.all([
+      api.get('/skills'),
+      roadmapStore.fetchCareers({ stream: education.value.field, degree: education.value.degree })
+    ]);
+    allSkills.value = skillsRes.data.skills;
+  } catch (err) {
+    console.error('Failed to initialize onboarding data:', err);
+  }
 });
 
 const canProceed = computed(() => {
@@ -221,7 +241,16 @@ async function saveStep(stepNum, data) {
 
 async function nextStep() {
   try {
-    if (step.value === 1) await saveStep(1, education.value);
+    if (step.value === 1) {
+      await saveStep(1, education.value);
+      userStore.setDegreePreference(education.value.degree);
+      userStore.setStreamPreference(education.value.field);
+      // Refresh career list dynamically based on degree/stream
+      roadmapStore.fetchCareers({
+        stream: education.value.field,
+        degree: education.value.degree
+      });
+    }
     if (step.value === 2) await saveStep(2, { status: status.value, jobTitle: jobTitle.value });
     if (step.value === 3) await saveStep(3, { skills: userSkills.value });
     step.value += 1;
@@ -237,12 +266,14 @@ function prevStep() {
 async function finish() {
   try {
     await saveStep(4, { careerId: targetCareer.value });
+    await userStore.updateTargetCareer(targetCareer.value);
     await auth.refreshUser();
     router.push('/dashboard');
   } catch (e) {
     /* error already set */
   }
 }
+
 </script>
 
 <style scoped>

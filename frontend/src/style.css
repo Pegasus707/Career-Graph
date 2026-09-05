@@ -153,3 +153,52 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .badge-notstarted { background: var(--surface-2); color: var(--text-dim); }
 
 .error-text { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; font-weight: 500; }
+
+.loading-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: global-spin 0.8s linear infinite;
+  margin-bottom: 0.5rem;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: global-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes global-spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.error-card {
+  padding: 1.5rem;
+  border: 1px solid var(--danger-soft, #ef4444);
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+.error-card p {
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
