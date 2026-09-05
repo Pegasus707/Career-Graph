@@ -57,7 +57,7 @@ exports.updateTargetCareer = async (req, res, next) => {
 
 exports.getProfile = async (req, res, next) => {
   try {
-    const profile = await UserProfile.findOne({ user: req.user._id }).populate('skills.skill', 'name slug');
+    const profile = await UserProfile.findOne({ user: req.user._id }).populate('skills.skill', 'name slug skillId');
     const career = req.user.targetCareer ? await Career.findById(req.user.targetCareer).select('name slug') : null;
 
     res.json({

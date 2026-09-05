@@ -6,10 +6,14 @@ const UserProfile = require('../models/UserProfile');
 const CourseProgress = require('../models/CourseProgress');
 const LessonProgress = require('../models/LessonProgress');
 
+function escapeRegex(str) {
+  return str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
 exports.listSkills = async (req, res, next) => {
   try {
     const q = req.query.q;
-    const filter = q ? { name: new RegExp(q, 'i') } : {};
+    const filter = q && q.trim() ? { name: new RegExp(escapeRegex(q.trim()), 'i') } : {};
     const skills = await Skill.find(filter).select('name slug category');
     res.json({ skills });
   } catch (err) {
@@ -29,14 +33,20 @@ exports.getSkill = async (req, res, next) => {
 
     if (req.user) {
       const profile = await UserProfile.findOne({ user: req.user._id });
-      const userSkill = profile ? profile.skills.find((s) => s.skill.toString() === skill._id.toString()) : null;
+      const userSkill = profile && profile.skills
+        ? profile.skills.find(
+            (s) => s.skill && (s.skill._id ? s.skill._id.toString() : s.skill.toString()) === skill._id.toString()
+          )
+        : null;
       const userLevel = userSkill ? userSkill.level : 0;
 
       let requiredLevel = null;
       let careerName = null;
       if (req.user.targetCareer) {
         const career = await Career.findById(req.user.targetCareer);
-        const match = career && career.requiredSkills.find((r) => r.skill.toString() === skill._id.toString());
+        const match = career && (career.requiredSkills || []).find(
+          (r) => r.skill && r.skill.toString() === skill._id.toString()
+        );
         if (match) {
           requiredLevel = match.requiredLevel;
           careerName = career.name;

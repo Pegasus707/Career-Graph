@@ -1,10 +1,11 @@
+const mongoose = require('mongoose');
 const Career = require('../models/Career');
 const Course = require('../models/Course');
 const Level = require('../models/Level');
 const CourseProgress = require('../models/CourseProgress');
 const UserProfile = require('../models/UserProfile');
 
-const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
+const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
 
 async function countCourseLessons(courseId) {
   const levels = await Level.find({ course: courseId });
@@ -16,10 +17,30 @@ async function countCourseLessons(courseId) {
 }
 
 async function buildRoadmap(userId, careerId) {
-  const career = await Career.findById(careerId).populate({
-    path: 'requiredSkills.skill',
-    populate: { path: 'prerequisites', select: '_id name slug' }
-  });
+  let career = null;
+
+  if (careerId) {
+    const isObjectId = mongoose.Types.ObjectId.isValid(careerId);
+    if (isObjectId) {
+      career = await Career.findById(careerId).populate({
+        path: 'requiredSkills.skill',
+        populate: { path: 'prerequisites', select: '_id name slug' }
+      });
+    } else {
+      career = await Career.findOne({ slug: careerId }).populate({
+        path: 'requiredSkills.skill',
+        populate: { path: 'prerequisites', select: '_id name slug' }
+      });
+    }
+  }
+
+  // Graceful fallback if career ID was from a previous seed or invalid:
+  if (!career) {
+    career = await Career.findOne().populate({
+      path: 'requiredSkills.skill',
+      populate: { path: 'prerequisites', select: '_id name slug' }
+    });
+  }
 
   if (!career) {
     const err = new Error('Career not found');
@@ -30,8 +51,11 @@ async function buildRoadmap(userId, careerId) {
   const profile = await UserProfile.findOne({ user: userId });
   const declaredSkills = profile ? profile.skills : [];
 
-  const skillIds = career.requiredSkills.map((r) => r.skill._id);
-  const skillIdStrings = career.requiredSkills
+  const validRequirements = (career.requiredSkills || []).filter((r) => r && r.skill != null);
+  const totalReqs = validRequirements.length;
+
+  const skillIds = validRequirements.map((r) => r.skill._id);
+  const skillIdStrings = validRequirements
     .map((r) => r.skillId || (r.skill && (r.skill.skillId || r.skill.slug)))
     .filter(Boolean);
 
@@ -48,12 +72,10 @@ async function buildRoadmap(userId, careerId) {
     ]
   });
 
-  const totalReqs = career.requiredSkills.length;
-
-  const rawNodes = career.requiredSkills.map((req, index) => {
+  const rawNodes = validRequirements.map((req, index) => {
     const skill = req.skill;
     const userSkill = declaredSkills.find(
-      (s) => s.skill && s.skill.toString() === skill._id.toString()
+      (s) => s.skill && (s.skill._id ? s.skill._id.toString() : s.skill.toString()) === skill._id.toString()
     );
     const declaredLevel = userSkill ? userSkill.level : 0;
 
@@ -69,13 +91,24 @@ async function buildRoadmap(userId, careerId) {
     );
     const courseProgress = progressDoc ? progressDoc.percent : 0;
 
-    const effectiveLevel = courseProgress === 100 ? Math.max(declaredLevel, req.requiredLevel) : declaredLevel;
+    // A skill is only fully completed if all lessons are finished (100%) or user declared 'Know everything' (level >= 3)
+    const isCompleted = courseProgress === 100 || declaredLevel >= 3;
 
     let status = 'not_started';
-    if (effectiveLevel >= req.requiredLevel) status = 'completed';
-    else if (courseProgress > 0 || declaredLevel > 0) status = 'in_progress';
+    let percent = 0;
 
-    const percent = status === 'completed' ? 100 : courseProgress;
+    if (isCompleted) {
+      status = 'completed';
+      percent = 100;
+    } else if (declaredLevel === 2) {
+      // 'Know a little basics'
+      status = 'in_progress';
+      percent = Math.max(50, courseProgress);
+    } else if (declaredLevel === 1 || courseProgress > 0) {
+      // 'Beginner' or started course lessons
+      status = 'in_progress';
+      percent = Math.max(25, courseProgress);
+    }
 
     // Determine Phase from Career requirement schema, fallback to index ratio
     const ratio = index / Math.max(1, totalReqs);
@@ -97,10 +130,10 @@ async function buildRoadmap(userId, careerId) {
       name: skill.name,
       slug: skill.slug,
       skillObj: skill,
-      requiredLevel: req.requiredLevel,
-      requiredLevelLabel: LEVEL_LABELS[req.requiredLevel],
-      userLevel: declaredLevel,
-      userLevelLabel: LEVEL_LABELS[declaredLevel],
+      requiredLevel: req.requiredLevel || 1,
+      requiredLevelLabel: LEVEL_LABELS[req.requiredLevel] || 'Beginner',
+      userLevel: declaredLevel || 0,
+      userLevelLabel: LEVEL_LABELS[declaredLevel] || 'None',
       status,
       percent,
       courseId: course ? course._id : null,

@@ -42,20 +42,30 @@ export const useRoadmapStore = defineStore('roadmap', {
         const userStore = useUserStore();
         const params = {};
 
-        if (filters.stream !== undefined) {
-          params.stream = filters.stream;
-        } else if (userStore.userStream) {
-          params.stream = userStore.userStream;
-        }
+        if (filters.all) {
+          if (filters.category) {
+            params.category = filters.category;
+          }
+        } else {
+          if (filters.stream !== undefined) {
+            if (filters.stream && filters.stream.trim()) {
+              params.stream = filters.stream.trim();
+            }
+          } else if (userStore.userStream) {
+            params.stream = userStore.userStream;
+          }
 
-        if (filters.degree !== undefined) {
-          params.degree = filters.degree;
-        } else if (userStore.userDegree) {
-          params.degree = userStore.userDegree;
-        }
+          if (filters.degree !== undefined) {
+            if (filters.degree && filters.degree.trim()) {
+              params.degree = filters.degree.trim();
+            }
+          } else if (userStore.userDegree) {
+            params.degree = userStore.userDegree;
+          }
 
-        if (filters.category) {
-          params.category = filters.category;
+          if (filters.category) {
+            params.category = filters.category;
+          }
         }
 
         const { data } = await api.get('/careers', { params });

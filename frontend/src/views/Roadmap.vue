@@ -117,6 +117,17 @@
       </p>
     </template>
 
+    <template v-else>
+      <div class="empty-roadmap-card card">
+        <div class="empty-roadmap-icon">🗺️</div>
+        <h2>No Target Career Selected</h2>
+        <p>{{ roadmapStore.error || 'Please select a career track to generate your personalized learning roadmap.' }}</p>
+        <button type="button" class="btn btn-primary" @click="openCareerModal">
+          Choose Career Track &rarr;
+        </button>
+      </div>
+    </template>
+
     <!-- Context Menu for Right Click -->
     <div
       v-if="contextMenu.visible"
@@ -200,14 +211,14 @@
               v-for="c in careers"
               :key="c._id"
               class="career-card-item"
-              :class="{ active: data.career?.id === c._id }"
+              :class="{ active: data.career?.id === c._id || data.career?._id === c._id }"
               @click="selectCareer(c._id)"
             >
               <div class="career-card-content">
                 <h3>{{ c.name }}</h3>
                 <p>{{ c.description }}</p>
               </div>
-              <span v-if="data.career?.id === c._id" class="current-badge">Active Track</span>
+              <span v-if="data.career?.id === c._id || data.career?._id === c._id" class="current-badge">Active Track</span>
               <span v-else class="select-badge">Select Track &rarr;</span>
             </div>
           </div>
@@ -292,10 +303,9 @@ function resolveNodeStatus(node) {
 function isPhaseLocked(index) {
   if (index === 0) return false;
   const phases = data.value.phases || [];
-  if (phases[index]?.isLocked) return true;
   for (let i = 0; i < index; i++) {
     const p = phases[i];
-    if (!p) continue;
+    if (!p || !p.nodes) continue;
     const allDone = p.nodes.every((n) => isNodeCompleted(n));
     if (!allDone) return true;
   }
@@ -335,14 +345,11 @@ function handleQuickStatusClick(node, phaseIndex) {
 
 async function loadModalCareers() {
   try {
-    const filters = {};
     if (filterStreamActive.value && userStore.userStream) {
-      filters.stream = userStore.userStream;
+      await roadmapStore.fetchCareers({ stream: userStore.userStream });
+    } else {
+      await roadmapStore.fetchCareers({ all: true });
     }
-    if (userStore.userDegree) {
-      filters.degree = userStore.userDegree;
-    }
-    await roadmapStore.fetchCareers(filters);
   } catch (err) {
     console.error('Failed to load careers:', err);
   }
@@ -364,7 +371,8 @@ function closeCareerModal() {
 }
 
 async function selectCareer(careerId) {
-  if (careerId === data.value.career?.id) {
+  const currentId = data.value.career?.id || data.value.career?._id;
+  if (careerId === currentId) {
     closeCareerModal();
     return;
   }
@@ -458,6 +466,20 @@ function badgeClass(status, isLocked) {
 <style scoped>
 .roadmap-page { padding: 2.5rem 1.5rem 4rem; position: relative; }
 .loading { padding: 4rem 0; text-align: center; color: var(--text-dim); }
+
+.empty-roadmap-card {
+  text-align: center;
+  padding: 3.5rem 2rem;
+  margin: 2rem auto;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.empty-roadmap-icon { font-size: 3rem; }
+.empty-roadmap-card h2 { font-size: 1.4rem; margin: 0; }
+.empty-roadmap-card p { color: var(--text-dim); margin: 0; }
 
 .roadmap-header h1 { font-size: 1.7rem; margin-bottom: 0.25rem; }
 .roadmap-header p { margin: 0; color: var(--text-dim); }

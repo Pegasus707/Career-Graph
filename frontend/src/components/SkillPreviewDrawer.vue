@@ -125,13 +125,13 @@ const courseProgress = ref(0);
 const personalization = ref(null);
 const completedIds = ref(new Set());
 
-const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
+const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
 function levelLabel(n) {
   return LEVEL_LABELS[n] ?? 'None';
 }
 
 const meetsRequirement = computed(
-  () => personalization.value && personalization.value.userLevel >= personalization.value.requiredLevel
+  () => personalization.value && personalization.value.userLevel >= 3
 );
 
 // Shared Skill Reflection: Check if skill is completed across any track in userStore
@@ -192,6 +192,18 @@ async function handleToggleLesson(lessonId, levelId, checked) {
 
     completedIds.value = next;
     courseProgress.value = data.courseProgress;
+
+    if (data.courseProgress === 100 && skill.value) {
+      userStore.addCompletedSkill(skill.value._id);
+      userStore.addCompletedSkill(skill.value.slug);
+      if (skill.value.skillId) userStore.addCompletedSkill(skill.value.skillId);
+    } else if (data.courseProgress < 100 && skill.value) {
+      if (!personalization.value || personalization.value.userLevel < 3) {
+        userStore.removeCompletedSkill(skill.value._id);
+        userStore.removeCompletedSkill(skill.value.slug);
+        if (skill.value.skillId) userStore.removeCompletedSkill(skill.value.skillId);
+      }
+    }
 
     // Emit event so Roadmap.vue updates its node status and overall percentage live
     emit('progress-updated', { slug: props.slug, courseProgress: data.courseProgress });

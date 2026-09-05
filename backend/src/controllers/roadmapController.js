@@ -54,7 +54,9 @@ function computeUnlockedPhases(roadmap) {
       }
 
       // Sync with master list of nodes
-      const masterNode = roadmap.nodes.find((n) => n.skillId.toString() === node.skillId.toString());
+      const masterNode = roadmap.nodes.find(
+        (n) => n.skillId && node.skillId && n.skillId.toString() === node.skillId.toString()
+      );
       if (masterNode) {
         masterNode.isLocked = node.isLocked;
         masterNode.lockedReason = node.lockedReason;

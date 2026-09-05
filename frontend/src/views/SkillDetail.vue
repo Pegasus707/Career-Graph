@@ -110,8 +110,10 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../services/api';
+import { useUserStore } from '../stores/user';
 
 const route = useRoute();
+const userStore = useUserStore();
 const loading = ref(true);
 const skill = ref(null);
 const course = ref(null);
@@ -135,13 +137,13 @@ async function load() {
 onMounted(load);
 watch(() => route.params.slug, load);
 
-const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
+const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
 function levelLabel(n) {
   return LEVEL_LABELS[n] ?? 'None';
 }
 
 const meetsRequirement = computed(
-  () => personalization.value && personalization.value.userLevel >= personalization.value.requiredLevel
+  () => personalization.value && personalization.value.userLevel >= 3
 );
 const levelBadgeClass = computed(() => (meetsRequirement.value ? 'badge-done' : 'badge-progress'));
 
@@ -156,6 +158,18 @@ async function toggleLesson(lessonId, levelId, checked) {
   else next.delete(lessonId);
   completedIds.value = next;
   courseProgress.value = data.courseProgress;
+
+  if (data.courseProgress === 100 && skill.value) {
+    userStore.addCompletedSkill(skill.value._id);
+    userStore.addCompletedSkill(skill.value.slug);
+    if (skill.value.skillId) userStore.addCompletedSkill(skill.value.skillId);
+  } else if (data.courseProgress < 100 && skill.value) {
+    if (!personalization.value || personalization.value.userLevel < 3) {
+      userStore.removeCompletedSkill(skill.value._id);
+      userStore.removeCompletedSkill(skill.value.slug);
+      if (skill.value.skillId) userStore.removeCompletedSkill(skill.value.skillId);
+    }
+  }
 }
 </script>
 

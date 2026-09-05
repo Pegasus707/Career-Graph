@@ -202,14 +202,11 @@ const chartData = computed(() =>
 
 async function loadCareersList() {
   try {
-    const filters = {};
     if (filterStreamActive.value && userStream.value) {
-      filters.stream = userStream.value;
+      await roadmapStore.fetchCareers({ stream: userStream.value });
+    } else {
+      await roadmapStore.fetchCareers({ all: true });
     }
-    if (userDegree.value) {
-      filters.degree = userDegree.value;
-    }
-    await roadmapStore.fetchCareers(filters);
   } catch (err) {
     console.error('Failed to load careers:', err);
   }

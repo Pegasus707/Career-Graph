@@ -74,7 +74,7 @@ async function loadProfile() {
 
 onMounted(loadProfile);
 
-const LEVEL_LABELS = ['None', 'Beginner', 'Intermediate', 'Advanced', 'Expert'];
+const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
 function levelLabel(n) {
   return LEVEL_LABELS[n] ?? 'None';
 }

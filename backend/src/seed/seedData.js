@@ -557,8 +557,10 @@ const skillsData = [
   }
 ];
 
-const csStreams = ['CS', 'IT', 'Computer Science', 'Information Technology', 'Software Engineering'];
-const csDegrees = ['BSc-IT', 'B.Tech', 'BE', 'BCA', 'MCA', "Bachelor's Degree", "Master's Degree"];
+const csStreams = ['Computer Science'];
+const devopsStreams = ['DevOps & Cloud Engineering'];
+const aiStreams = ['AI & Data Science'];
+const csDegrees = ['High School', 'Diploma', "Bachelor's Degree", "Master's Degree", 'Other'];
 
 const careersData = [
   {
@@ -591,7 +593,7 @@ const careersData = [
     slug: 'devops-engineer',
     category: 'DevOps & Cloud',
     description: 'DevOps engineers automate software deployment pipelines, manage containerized clusters, and ensure high availability cloud infrastructure.',
-    streams: [...csStreams, 'Systems Engineering'],
+    streams: devopsStreams,
     degrees: csDegrees,
     requiredSkills: [
       // Phase 1: Foundations
@@ -614,7 +616,7 @@ const careersData = [
     slug: 'ai-ml-engineer',
     category: 'Artificial Intelligence',
     description: 'AI/ML engineers design, train, and operationalize statistical models, deep neural networks, and generative AI systems.',
-    streams: [...csStreams, 'Data Science', 'Artificial Intelligence'],
+    streams: aiStreams,
     degrees: csDegrees,
     requiredSkills: [
       // Phase 1: Foundations
@@ -680,8 +682,8 @@ const careersData = [
     slug: 'data-analyst',
     category: 'Data',
     description: 'Data analysts collect, clean, and interpret data to extract business insights and generate actionable dashboards.',
-    streams: [...csStreams, 'Data Science', 'Statistics', 'Mathematics'],
-    degrees: [...csDegrees, 'B.Sc Statistics', 'B.Sc Mathematics'],
+    streams: aiStreams,
+    degrees: csDegrees,
     requiredSkills: [
       // Phase 1: Foundations
       { slug: 'python', level: 3, phase: 'foundations' },

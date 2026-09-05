@@ -15,7 +15,7 @@
 
         <label class="label">Highest degree</label>
         <select v-model="education.degree" class="input-field">
-          <option value="">Select…</option>
+          <option value="">Select degree…</option>
           <option>High School</option>
           <option>Diploma</option>
           <option>Bachelor's Degree</option>
@@ -24,7 +24,10 @@
         </select>
 
         <label class="label" style="margin-top: 1rem;">Field of study</label>
-        <input v-model="education.field" type="text" class="input-field" placeholder="e.g. Computer Engineering" />
+        <select v-model="education.field" class="input-field">
+          <option value="">Select field of study…</option>
+          <option v-for="opt in fieldOptions" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
 
         <label class="label" style="margin-top: 1rem;">Graduation year</label>
         <input v-model.number="education.gradYear" type="number" class="input-field" placeholder="e.g. 2027" />
@@ -62,40 +65,88 @@
       <!-- STEP 3: EXISTING SKILLS -->
       <section v-else-if="step === 3">
         <h2>What skills do you already have?</h2>
-        <p>Search, add a skill, and set how confident you are with it.</p>
+        <p>
+          Select the skills you already know for <strong>{{ education.field || 'your field' }}</strong>:
+        </p>
 
-        <div class="skill-search">
-          <input v-model="skillQuery" type="text" class="input-field" placeholder="Search skills… (e.g. JavaScript)" />
-          <div v-if="filteredSkills.length" class="skill-suggestions">
-            <button
-              v-for="s in filteredSkills"
-              :key="s._id"
-              type="button"
-              class="suggestion-item"
-              @click="addSkill(s)"
-            >
-              {{ s.name }}
-            </button>
+        <div v-if="fieldSkills.length" class="field-skills-grid">
+          <div
+            v-for="s in fieldSkills"
+            :key="s._id"
+            class="field-skill-card"
+            :class="{ active: isSkillSelected(s._id) }"
+          >
+            <label class="skill-checkbox-label">
+              <input
+                type="checkbox"
+                :checked="isSkillSelected(s._id)"
+                @change="toggleFieldSkill(s)"
+              />
+              <span class="skill-label-text">{{ s.name }}</span>
+            </label>
+
+            <div v-if="isSkillSelected(s._id)" class="skill-level-wrapper">
+              <select
+                :value="getSkillLevel(s._id)"
+                @change="setSkillLevel(s._id, Number($event.target.value))"
+                class="input-field level-select-mini"
+              >
+                <option :value="1">Beginner</option>
+                <option :value="2">Know a little basics</option>
+                <option :value="3">Know everything</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div class="selected-skills-box">
-          <h3 class="selected-skills-heading">
-            Your skills <span v-if="userSkills.length">({{ userSkills.length }})</span>
-          </h3>
-          <div v-if="userSkills.length" class="selected-skills">
-            <div v-for="row in userSkills" :key="row.skill" class="selected-skill-row">
-              <span class="selected-skill-name">{{ skillName(row.skill) }}</span>
-              <select v-model.number="row.level" class="input-field level-select">
-                <option :value="1">Beginner</option>
-                <option :value="2">Intermediate</option>
-                <option :value="3">Advanced</option>
-                <option :value="4">Expert</option>
-              </select>
-              <button type="button" class="btn btn-ghost" @click="removeSkill(row.skill)">Remove</button>
+        <div v-else class="empty-hint">
+          Loading skills relevant to {{ education.field || 'your field' }}…
+        </div>
+
+        <!-- Optional search for extra skills outside the field -->
+        <div class="additional-skills-section">
+          <button
+            type="button"
+            class="btn-toggle-search"
+            @click="showExtraSearch = !showExtraSearch"
+          >
+            {{ showExtraSearch ? '– Hide extra skills search' : '+ Add more skills outside your field' }}
+          </button>
+
+          <div v-if="showExtraSearch" class="skill-search">
+            <input v-model="skillQuery" type="text" class="input-field" placeholder="Search other skills… (e.g. Docker, Python)" />
+            <div v-if="filteredSkills.length" class="skill-suggestions">
+              <button
+                v-for="s in filteredSkills"
+                :key="s._id"
+                type="button"
+                class="suggestion-item"
+                @click="addSkill(s)"
+              >
+                {{ s.name }}
+              </button>
             </div>
           </div>
-          <p v-else class="empty-hint">Nothing added yet — search above and click a skill to add it here, or skip if you're starting fresh.</p>
+        </div>
+
+        <!-- Additional selected skills summary if any added from extra search -->
+        <div v-if="extraSelectedSkills.length" class="extra-selected-box">
+          <span class="extra-selected-title">Additional skills added:</span>
+          <div class="extra-selected-chips">
+            <div v-for="row in extraSelectedSkills" :key="row.skill" class="extra-chip">
+              <span class="extra-chip-name">{{ skillName(row.skill) }}</span>
+              <select
+                :value="row.level"
+                @change="setSkillLevel(row.skill, Number($event.target.value))"
+                class="input-field level-select-mini"
+              >
+                <option :value="1">Beginner</option>
+                <option :value="2">Know a little basics</option>
+                <option :value="3">Know everything</option>
+              </select>
+              <button type="button" class="extra-chip-remove" @click="removeSkill(row.skill)">&times;</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -105,8 +156,15 @@
         <p>We'll compare this career's required skills against what you already know.</p>
 
         <div v-if="education.field" class="stream-info-badge">
-          <span>🎓 Filtered for stream: <strong>{{ education.field }}</strong></span>
-          <button type="button" class="btn-clear-filter" @click="clearStreamFilter">Show all</button>
+          <span v-if="!showingAllTracks">
+            🎓 Filtered for stream: <strong>{{ education.field }}</strong>
+          </span>
+          <span v-else>
+            🌐 Showing all available career tracks
+          </span>
+          <button type="button" class="btn-clear-filter" @click="toggleStreamFilter">
+            {{ showingAllTracks ? `Filter by ${education.field}` : 'Show all tracks' }}
+          </button>
         </div>
 
         <div v-if="roadmapStore.loadingCareers" class="loading-box">
@@ -116,7 +174,9 @@
 
         <div v-else-if="careers.length === 0" class="empty-careers-hint">
           <p>No tracks specifically matched "<strong>{{ education.field }}</strong>".</p>
-          <button type="button" class="btn btn-secondary btn-sm" @click="clearStreamFilter">Browse all available tracks</button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="toggleStreamFilter">
+            Browse all available tracks
+          </button>
         </div>
 
         <div v-else class="option-grid">
@@ -153,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -170,9 +230,16 @@ const loading = ref(false);
 const error = ref('');
 
 // Step 1
+const fieldOptions = [
+  'Computer Science',
+  'DevOps & Cloud Engineering',
+  'AI & Data Science'
+];
+
+const initialStream = userStore.userStream || 'Computer Science';
 const education = ref({
   degree: userStore.userDegree || '',
-  field: userStore.userStream || '',
+  field: fieldOptions.includes(initialStream) ? initialStream : 'Computer Science',
   gradYear: null,
   stillStudying: false
 });
@@ -190,6 +257,62 @@ const statusOptions = [
 const allSkills = ref([]);
 const skillQuery = ref('');
 const userSkills = ref([]); // [{ skill: id, level: n }]
+const showExtraSearch = ref(false);
+
+const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
+function levelLabel(n) {
+  return LEVEL_LABELS[n] ?? 'None';
+}
+
+const FIELD_SKILLS_MAP = {
+  'Computer Science': [
+    'html', 'css', 'javascript', 'git', 'rest-apis',
+    'vue', 'nodejs', 'express', 'mongodb', 'sql', 'docker'
+  ],
+  'DevOps & Cloud Engineering': [
+    'linux', 'git', 'networking-fundamentals', 'docker', 'cloud-aws',
+    'cicd-pipelines', 'python', 'kubernetes', 'terraform', 'monitoring-observability'
+  ],
+  'AI & Data Science': [
+    'python', 'sql', 'git', 'linear-algebra-stats', 'data-analysis',
+    'machine-learning', 'deep-learning', 'genai-llms', 'mlops', 'docker'
+  ]
+};
+
+const fieldSkills = computed(() => {
+  const slugs = FIELD_SKILLS_MAP[education.value.field] || [];
+  if (!slugs.length) return allSkills.value;
+  return allSkills.value.filter((s) => slugs.includes(s.slug));
+});
+
+const extraSelectedSkills = computed(() => {
+  const fieldSkillIds = new Set(fieldSkills.value.map((s) => s._id));
+  return userSkills.value.filter((r) => !fieldSkillIds.has(r.skill));
+});
+
+function isSkillSelected(skillId) {
+  return userSkills.value.some((r) => r.skill === skillId);
+}
+
+function getSkillLevel(skillId) {
+  const row = userSkills.value.find((r) => r.skill === skillId);
+  return row ? row.level : 1;
+}
+
+function setSkillLevel(skillId, level) {
+  const row = userSkills.value.find((r) => r.skill === skillId);
+  if (row) {
+    row.level = level;
+  }
+}
+
+function toggleFieldSkill(skill) {
+  if (isSkillSelected(skill._id)) {
+    removeSkill(skill._id);
+  } else {
+    userSkills.value.push({ skill: skill._id, level: 1 });
+  }
+}
 
 const filteredSkills = computed(() => {
   if (!skillQuery.value.trim()) return [];
@@ -204,7 +327,7 @@ function skillName(id) {
 }
 
 function addSkill(skill) {
-  userSkills.value.push({ skill: skill._id, level: 2 });
+  userSkills.value.push({ skill: skill._id, level: 1 });
   skillQuery.value = '';
 }
 
@@ -215,12 +338,33 @@ function removeSkill(id) {
 // Step 4
 const careers = computed(() => roadmapStore.careers);
 const targetCareer = ref('');
+const showingAllTracks = ref(false);
+
+async function loadCareers() {
+  try {
+    if (showingAllTracks.value) {
+      await roadmapStore.fetchCareers({ all: true });
+    } else {
+      await roadmapStore.fetchCareers({
+        stream: education.value.field,
+        degree: education.value.degree
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load careers:', err);
+  }
+}
+
+async function toggleStreamFilter() {
+  showingAllTracks.value = !showingAllTracks.value;
+  await loadCareers();
+}
 
 onMounted(async () => {
   try {
     const [skillsRes] = await Promise.all([
       api.get('/skills'),
-      roadmapStore.fetchCareers({ stream: education.value.field, degree: education.value.degree })
+      loadCareers()
     ]);
     allSkills.value = skillsRes.data.skills;
   } catch (err) {
@@ -228,8 +372,15 @@ onMounted(async () => {
   }
 });
 
+watch(step, (newStep) => {
+  if (newStep === 4) {
+    showingAllTracks.value = false;
+    loadCareers();
+  }
+});
+
 const canProceed = computed(() => {
-  if (step.value === 1) return !!education.value.degree;
+  if (step.value === 1) return !!education.value.degree && !!education.value.field;
   if (step.value === 2) return !!status.value;
   if (step.value === 3) return true; // skills are optional
   if (step.value === 4) return !!targetCareer.value;
@@ -255,14 +406,15 @@ async function nextStep() {
       await saveStep(1, education.value);
       userStore.setDegreePreference(education.value.degree);
       userStore.setStreamPreference(education.value.field);
-      // Refresh career list dynamically based on degree/stream
-      roadmapStore.fetchCareers({
-        stream: education.value.field,
-        degree: education.value.degree
-      });
+      showingAllTracks.value = false;
+      await loadCareers();
     }
     if (step.value === 2) await saveStep(2, { status: status.value, jobTitle: jobTitle.value });
-    if (step.value === 3) await saveStep(3, { skills: userSkills.value });
+    if (step.value === 3) {
+      await saveStep(3, { skills: userSkills.value });
+      showingAllTracks.value = false;
+      await loadCareers();
+    }
     step.value += 1;
   } catch (e) {
     /* error already set */
@@ -273,18 +425,11 @@ function prevStep() {
   step.value -= 1;
 }
 
-async function clearStreamFilter() {
-  try {
-    await roadmapStore.fetchCareers({ stream: '', degree: '' });
-  } catch (err) {
-    console.error('Failed to load all careers:', err);
-  }
-}
-
 async function finish() {
   try {
     await saveStep(4, { careerId: targetCareer.value });
     await userStore.updateTargetCareer(targetCareer.value);
+    await userStore.fetchProfile();
     await auth.refreshUser();
     router.push('/dashboard');
   } catch (e) {
@@ -393,12 +538,131 @@ async function finish() {
 .selected-skill-row { display: flex; align-items: center; gap: 0.75rem; }
 .selected-skill-name { flex: 1; font-weight: 500; }
 .level-select { width: 150px; }
-.empty-hint { font-size: 0.85rem; margin: 0; }
+.field-skills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.field-skill-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.field-skill-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.field-skill-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.skill-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+.skill-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.skill-level-wrapper {
+  display: flex;
+  align-items: center;
+}
+.level-select-mini {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  height: 30px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.additional-skills-section {
+  margin-top: 1.25rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.75rem;
+}
+.btn-toggle-search {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.extra-selected-box {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.extra-selected-title {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+.extra-selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.extra-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+.extra-chip-remove {
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.extra-chip-remove:hover { color: #ef4444; }
+
+.empty-hint { font-size: 0.85rem; margin: 1rem 0; color: var(--text-dim); }
 
 .step-actions { display: flex; align-items: center; margin-top: 2rem; }
 
 @media (max-width: 600px) {
   .option-grid { grid-template-columns: 1fr; }
+  .field-skills-grid { grid-template-columns: 1fr; }
   .selected-skill-row { flex-wrap: wrap; }
 }
 </style>
