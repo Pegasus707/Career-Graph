@@ -99,14 +99,24 @@
         </div>
       </section>
 
-      <!-- STEP 4: TARGET CAREER -->
+        <!-- STEP 4: TARGET CAREER -->
       <section v-else-if="step === 4">
         <h2>What do you want to become?</h2>
         <p>We'll compare this career's required skills against what you already know.</p>
 
+        <div v-if="education.field" class="stream-info-badge">
+          <span>🎓 Filtered for stream: <strong>{{ education.field }}</strong></span>
+          <button type="button" class="btn-clear-filter" @click="clearStreamFilter">Show all</button>
+        </div>
+
         <div v-if="roadmapStore.loadingCareers" class="loading-box">
           <span class="loading-spinner"></span>
           <p>Loading matching career tracks…</p>
+        </div>
+
+        <div v-else-if="careers.length === 0" class="empty-careers-hint">
+          <p>No tracks specifically matched "<strong>{{ education.field }}</strong>".</p>
+          <button type="button" class="btn btn-secondary btn-sm" @click="clearStreamFilter">Browse all available tracks</button>
         </div>
 
         <div v-else class="option-grid">
@@ -263,6 +273,14 @@ function prevStep() {
   step.value -= 1;
 }
 
+async function clearStreamFilter() {
+  try {
+    await roadmapStore.fetchCareers({ stream: '', degree: '' });
+  } catch (err) {
+    console.error('Failed to load all careers:', err);
+  }
+}
+
 async function finish() {
   try {
     await saveStep(4, { careerId: targetCareer.value });
@@ -286,6 +304,41 @@ async function finish() {
 .checkbox-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-dim); }
 
 .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+
+.stream-info-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.btn-clear-filter {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+.empty-careers-hint {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
 .option-card {
   text-align: left;
   padding: 0.9rem 1.1rem;

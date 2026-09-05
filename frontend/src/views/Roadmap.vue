@@ -44,12 +44,15 @@
               class="phase-section"
             >
               <!-- Phase Header Card -->
-              <div class="phase-header">
+              <div class="phase-header" :class="{ 'phase-locked': isPhaseLocked(index) }">
                 <div class="phase-title-group">
                   <span class="phase-badge">Phase {{ index + 1 }}</span>
+                  <span v-if="isPhaseLocked(index)" class="phase-lock-pill">🔒 Locked</span>
                   <h2 class="phase-title">{{ phase.title }}</h2>
                 </div>
-                <p class="phase-desc">{{ phase.description }}</p>
+                <p class="phase-desc">
+                  {{ isPhaseLocked(index) ? (phase.lockedReason || `Complete all skills in Phase ${index} to unlock this phase`) : phase.description }}
+                </p>
                 <div class="phase-meta">
                   <span class="phase-progress-text">{{ phase.completedCount }} of {{ phase.totalCount }} completed</span>
                   <span class="phase-progress-pct">{{ phase.percent }}%</span>
@@ -65,32 +68,34 @@
                   <div
                     class="skill-node"
                     :class="[
-                      statusClass(node.status, node.isLocked),
-                      { updating: updatingSkillId === node.skillId, 'node-is-locked': node.isLocked }
+                      statusClass(resolveNodeStatus(node), isNodeLocked(node, index)),
+                      { updating: updatingSkillId === node.skillId, 'node-is-locked': isNodeLocked(node, index) }
                     ]"
-                    :title="node.isLocked ? node.lockedReason : ''"
-                    @contextmenu.prevent="openContextMenu($event, node)"
+                    :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : ''"
+                    @contextmenu.prevent="openContextMenu($event, node, index)"
                   >
-                    <div class="skill-node-body" @click="handleNodeClick(node)">
+                    <div class="skill-node-body" @click="handleNodeClick(node, index)">
                       <div class="skill-node-header-row">
-                        <span v-if="node.isLocked" class="lock-icon" title="Locked skill">🔒</span>
+                        <span v-if="isNodeLocked(node, index)" class="lock-icon" title="Locked skill">🔒</span>
                         <span class="skill-node-name">{{ node.name }}</span>
                       </div>
-                      <span class="skill-node-pct">{{ node.isLocked ? 'Locked' : `${node.percent}%` }}</span>
+                      <span class="skill-node-pct">
+                        {{ isNodeLocked(node, index) ? 'Locked' : (resolveNodeStatus(node) === 'completed' ? '100%' : `${node.percent}%`) }}
+                      </span>
                     </div>
 
                     <button
                       type="button"
                       class="quick-status-btn"
-                      :class="badgeClass(node.status, node.isLocked)"
-                      :disabled="updatingSkillId === node.skillId || node.isLocked"
-                      @click.stop="handleQuickStatusClick(node)"
-                      :title="node.isLocked ? node.lockedReason : 'Quick toggle status'"
+                      :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, index))"
+                      :disabled="updatingSkillId === node.skillId || isNodeLocked(node, index)"
+                      @click.stop="handleQuickStatusClick(node, index)"
+                      :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : 'Quick toggle status'"
                     >
                       <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
                       <template v-else>
-                        <span class="status-icon">{{ statusIcon(node.status, node.isLocked) }}</span>
-                        <span class="status-text">{{ statusLabel(node.status, node.isLocked) }}</span>
+                        <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
+                        <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
                       </template>
                     </button>
                   </div>
@@ -108,7 +113,7 @@
       </div>
 
       <p class="tree-hint">
-        💡 <strong>Tip:</strong> Locked skills 🔒 require completing foundational prerequisites before they can be unlocked!
+        💡 <strong>Tip:</strong> Click any skill node to slide out the preview drawer. Right-click or use the button for quick status toggling.
       </p>
     </template>
 
@@ -166,7 +171,30 @@
             <button type="button" class="close-btn" @click="closeCareerModal">&times;</button>
           </div>
 
+          <div class="modal-filter-bar">
+            <span v-if="filterStreamActive && userStore.userStream">
+              🎓 Restricted to your stream: <strong>{{ userStore.userStream }}</strong>
+            </span>
+            <span v-else>
+              🌐 Showing all available career tracks
+            </span>
+            <button
+              v-if="userStore.userStream"
+              type="button"
+              class="btn-toggle-filter"
+              @click="toggleStreamFilter"
+            >
+              {{ filterStreamActive ? 'Show all' : `Filter by ${userStore.userStream}` }}
+            </button>
+          </div>
+
           <div v-if="loadingCareers" class="loading-careers">Loading available careers…</div>
+          <div v-else-if="careers.length === 0" class="modal-empty-tracks">
+            <p>No career tracks specifically match "<strong>{{ userStore.userStream }}</strong>".</p>
+            <button type="button" class="btn btn-secondary btn-sm" @click="toggleStreamFilter">
+              Show all available tracks
+            </button>
+          </div>
           <div v-else class="career-grid">
             <div
               v-for="c in careers"
@@ -218,6 +246,7 @@ const loadingCareers = computed(() => roadmapStore.loadingCareers);
 const selectedSkillSlug = ref('');
 const isDrawerOpen = ref(false);
 const isCareerModalOpen = ref(false);
+const filterStreamActive = ref(true);
 
 const contextMenu = reactive({
   visible: false,
@@ -243,34 +272,91 @@ function triggerToast(msg) {
   }, 4000);
 }
 
-function handleNodeClick(node) {
-  if (node.isLocked) {
-    triggerToast(`🔒 ${node.lockedReason || 'This skill is locked. Complete prerequisite skills first!'}`);
+// Shared Skill Reflection: Checks if skill was completed across any track in userStore
+function isNodeCompleted(node) {
+  if (!node) return false;
+  if (node.status === 'completed') return true;
+  return (
+    userStore.isSkillCompleted(node.skillId) ||
+    userStore.isSkillCompleted(node.slug) ||
+    userStore.isSkillCompleted(node.explicitSkillId)
+  );
+}
+
+function resolveNodeStatus(node) {
+  if (isNodeCompleted(node)) return 'completed';
+  return node.status;
+}
+
+// Sequential Phase Locking: Verifies all prior phases are 100% finished
+function isPhaseLocked(index) {
+  if (index === 0) return false;
+  const phases = data.value.phases || [];
+  if (phases[index]?.isLocked) return true;
+  for (let i = 0; i < index; i++) {
+    const p = phases[i];
+    if (!p) continue;
+    const allDone = p.nodes.every((n) => isNodeCompleted(n));
+    if (!allDone) return true;
+  }
+  return false;
+}
+
+function isNodeLocked(node, phaseIndex) {
+  if (isNodeCompleted(node)) return false;
+  if (isPhaseLocked(phaseIndex)) return true;
+  return !!node.isLocked;
+}
+
+function resolveLockedReason(node, phaseIndex) {
+  if (isPhaseLocked(phaseIndex)) {
+    const prevTitle = data.value.phases[phaseIndex - 1]?.title || `Phase ${phaseIndex}`;
+    return `Locked: Complete all skills in ${prevTitle} first`;
+  }
+  return node.lockedReason || 'Complete prerequisites first';
+}
+
+function handleNodeClick(node, phaseIndex) {
+  if (isNodeLocked(node, phaseIndex)) {
+    triggerToast(`🔒 ${resolveLockedReason(node, phaseIndex)}`);
     return;
   }
   openDrawer(node.slug);
 }
 
-function handleQuickStatusClick(node) {
-  if (node.isLocked) {
-    triggerToast(`🔒 ${node.lockedReason || 'This skill is locked. Complete prerequisite skills first!'}`);
+function handleQuickStatusClick(node, phaseIndex) {
+  if (isNodeLocked(node, phaseIndex)) {
+    triggerToast(`🔒 ${resolveLockedReason(node, phaseIndex)}`);
     return;
   }
   cycleStatus(node);
 }
 
+
+async function loadModalCareers() {
+  try {
+    const filters = {};
+    if (filterStreamActive.value && userStore.userStream) {
+      filters.stream = userStore.userStream;
+    }
+    if (userStore.userDegree) {
+      filters.degree = userStore.userDegree;
+    }
+    await roadmapStore.fetchCareers(filters);
+  } catch (err) {
+    console.error('Failed to load careers:', err);
+  }
+}
+
 async function openCareerModal() {
   isCareerModalOpen.value = true;
-  if (!careers.value.length) {
-    try {
-      await roadmapStore.fetchCareers({
-        stream: userStore.userStream,
-        degree: userStore.userDegree
-      });
-    } catch (err) {
-      console.error('Failed to load careers:', err);
-    }
-  }
+  filterStreamActive.value = true;
+  await loadModalCareers();
+}
+
+async function toggleStreamFilter() {
+  filterStreamActive.value = !filterStreamActive.value;
+  await loadModalCareers();
 }
 
 function closeCareerModal() {
@@ -677,6 +763,34 @@ function badgeClass(status, isLocked) {
   cursor: pointer;
   padding: 0;
   line-height: 1;
+}
+.modal-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.btn-toggle-filter {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  padding: 0;
+}
+.modal-empty-tracks {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 .loading-careers { padding: 3rem 1.5rem; text-align: center; color: var(--text-dim); }
 .career-grid {

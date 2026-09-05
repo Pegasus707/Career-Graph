@@ -17,19 +17,19 @@
 
           <div v-else-if="skill" class="drawer-body">
             <!-- Header Badges & Level Requirement -->
-            <div v-if="personalization" class="requirement-banner">
-              <div>
+            <div class="requirement-banner">
+              <div v-if="personalization">
                 <span class="req-label">Required Level</span>
                 <strong>{{ levelLabel(personalization.requiredLevel) }}</strong>
               </div>
               <div>
-                <span class="req-label">Your Declared Level</span>
-                <strong>{{ levelLabel(personalization.userLevel) }}</strong>
+                <span class="req-label">Your Level</span>
+                <strong>{{ levelLabel(isCompleted ? 4 : (personalization?.userLevel || 0)) }}</strong>
               </div>
               <div>
                 <span class="req-label">Status</span>
-                <span class="badge" :class="meetsRequirement ? 'badge-done' : 'badge-progress'">
-                  {{ meetsRequirement ? 'Requirement Met' : 'In Progress' }}
+                <span class="badge" :class="isCompleted ? 'badge-done' : 'badge-progress'">
+                  {{ isCompleted ? '✓ Completed' : 'In Progress' }}
                 </span>
               </div>
             </div>
@@ -44,11 +44,11 @@
             <section class="drawer-section" v-if="course">
               <div class="section-title-row">
                 <h3>Curriculum &amp; Lessons</h3>
-                <span class="progress-pct">{{ courseProgress }}% Completed</span>
+                <span class="progress-pct">{{ isCompleted ? 100 : courseProgress }}% Completed</span>
               </div>
 
               <div class="progress-track">
-                <div class="progress-fill" :style="{ width: courseProgress + '%' }"></div>
+                <div class="progress-fill" :style="{ width: (isCompleted ? 100 : courseProgress) + '%' }"></div>
               </div>
 
               <div class="levels-container">
@@ -60,10 +60,10 @@
                         <label class="lesson-label">
                           <input
                             type="checkbox"
-                            :checked="completedIds.has(lesson._id)"
+                            :checked="isCompleted || completedIds.has(lesson._id)"
                             @change="handleToggleLesson(lesson._id, level._id, $event.target.checked)"
                           />
-                          <span :class="{ 'lesson-done': completedIds.has(lesson._id) }">{{ lesson.title }}</span>
+                          <span :class="{ 'lesson-done': isCompleted || completedIds.has(lesson._id) }">{{ lesson.title }}</span>
                         </label>
                       </li>
                     </ul>
@@ -91,10 +91,10 @@
               </div>
             </section>
 
-            <!-- Footer Link -->
+            <!-- Footer Link directly to SkillDetail.vue -->
             <div class="drawer-footer">
-              <router-link :to="`/skills/${skill.slug}`" class="btn btn-secondary btn-full" @click="close">
-                Open Full Skill Intelligence Page &rarr;
+              <router-link :to="`/skills/${skill.slug}`" class="btn btn-primary btn-full full-page-btn" @click="close">
+                Full Page &amp; Resources &rarr;
               </router-link>
             </div>
           </div>
@@ -107,6 +107,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import api from '../services/api';
+import { useUserStore } from '../stores/user';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -114,6 +115,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'progress-updated']);
+const userStore = useUserStore();
 
 const loading = ref(false);
 const skill = ref(null);
@@ -130,6 +132,20 @@ function levelLabel(n) {
 
 const meetsRequirement = computed(
   () => personalization.value && personalization.value.userLevel >= personalization.value.requiredLevel
+);
+
+// Shared Skill Reflection: Check if skill is completed across any track in userStore
+const isGloballyCompleted = computed(() => {
+  if (!skill.value) return false;
+  return (
+    userStore.isSkillCompleted(skill.value._id) ||
+    userStore.isSkillCompleted(skill.value.slug) ||
+    userStore.isSkillCompleted(skill.value.skillId)
+  );
+});
+
+const isCompleted = computed(
+  () => meetsRequirement.value || courseProgress.value === 100 || isGloballyCompleted.value
 );
 
 async function loadSkillData() {
