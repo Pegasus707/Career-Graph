@@ -6,6 +6,8 @@ const UserProfile = require('../models/UserProfile');
 const CourseProgress = require('../models/CourseProgress');
 const LessonProgress = require('../models/LessonProgress');
 
+const { buildRoadmap, computeUnlockedPhases } = require('../services/skillGapService');
+
 function escapeRegex(str) {
   return str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
@@ -42,6 +44,9 @@ exports.getSkill = async (req, res, next) => {
 
       let requiredLevel = null;
       let careerName = null;
+      let isLocked = false;
+      let lockedReason = '';
+
       if (req.user.targetCareer) {
         const career = await Career.findById(req.user.targetCareer);
         const match = career && (career.requiredSkills || []).find(
@@ -50,6 +55,20 @@ exports.getSkill = async (req, res, next) => {
         if (match) {
           requiredLevel = match.requiredLevel;
           careerName = career.name;
+        }
+
+        try {
+          const rawRoadmap = await buildRoadmap(req.user._id, req.user.targetCareer);
+          const roadmap = computeUnlockedPhases(rawRoadmap);
+          const skillNode = (roadmap.nodes || []).find(
+            (n) => n.skillId.toString() === skill._id.toString() || n.slug === skill.slug
+          );
+          if (skillNode) {
+            isLocked = !!skillNode.isLocked;
+            lockedReason = skillNode.lockedReason || '';
+          }
+        } catch (e) {
+          // Ignore roadmap calculation errors
         }
       }
 
@@ -67,12 +86,14 @@ exports.getSkill = async (req, res, next) => {
         course,
         levels,
         courseProgress,
-        personalization: { userLevel, requiredLevel, careerName },
+        isLocked,
+        lockedReason,
+        personalization: { userLevel, requiredLevel, careerName, isLocked, lockedReason },
         completedLessonIds
       });
     }
 
-    res.json({ skill, course, levels, courseProgress: 0, personalization: null, completedLessonIds: [] });
+    res.json({ skill, course, levels, courseProgress: 0, isLocked: false, lockedReason: '', personalization: null, completedLessonIds: [] });
   } catch (err) {
     next(err);
   }

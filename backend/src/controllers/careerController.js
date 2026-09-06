@@ -47,4 +47,17 @@ exports.getCareer = async (req, res, next) => {
     next(err);
   }
 };
-
+exports.listStreams = async (req, res, next) => {
+  try {
+    const streams = await Career.distinct('streams');
+    const degrees = await Career.distinct('degrees');
+    const categories = await Career.distinct('category');
+    res.json({
+      streams: streams.filter(Boolean),
+      degrees: degrees.filter(Boolean),
+      categories: categories.filter(Boolean)
+    });
+  } catch (err) {
+    next(err);
+  }
+};

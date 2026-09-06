@@ -339,10 +339,10 @@
       @click.stop
     >
       <div class="context-header">{{ contextMenu.node?.name }}</div>
-      <template v-if="contextMenu.node?.isLocked">
+      <template v-if="contextMenu.isLocked">
         <div class="context-locked-warning">
           🔒 Locked<br/>
-          <small>{{ contextMenu.node?.lockedReason }}</small>
+          <small>{{ contextMenu.lockedReason }}</small>
         </div>
       </template>
       <template v-else>
@@ -373,61 +373,13 @@
       </template>
     </div>
 
-    <!-- Career Selector Modal -->
-    <Teleport to="body">
-      <div v-if="isCareerModalOpen" class="career-modal-backdrop" @click.self="closeCareerModal">
-        <div class="career-modal-card">
-          <div class="career-modal-header">
-            <div>
-              <h2>Choose Your Target Career</h2>
-              <p>Select a career track to view its tailored roadmap.</p>
-            </div>
-            <button type="button" class="close-btn" @click="closeCareerModal">&times;</button>
-          </div>
-
-          <div class="modal-filter-bar">
-            <span v-if="filterStreamActive && userStore.userStream">
-              🎓 Restricted to your stream: <strong>{{ userStore.userStream }}</strong>
-            </span>
-            <span v-else>
-              🌐 Showing all available career tracks
-            </span>
-            <button
-              v-if="userStore.userStream"
-              type="button"
-              class="btn-toggle-filter"
-              @click="toggleStreamFilter"
-            >
-              {{ filterStreamActive ? 'Show all' : `Filter by ${userStore.userStream}` }}
-            </button>
-          </div>
-
-          <div v-if="loadingCareers" class="loading-careers">Loading available careers…</div>
-          <div v-else-if="careers.length === 0" class="modal-empty-tracks">
-            <p>No career tracks specifically match "<strong>{{ userStore.userStream }}</strong>".</p>
-            <button type="button" class="btn btn-secondary btn-sm" @click="toggleStreamFilter">
-              Show all available tracks
-            </button>
-          </div>
-          <div v-else class="career-grid">
-            <div
-              v-for="c in careers"
-              :key="c._id"
-              class="career-card-item"
-              :class="{ active: data.career?.id === c._id || data.career?._id === c._id }"
-              @click="selectCareer(c._id)"
-            >
-              <div class="career-card-content">
-                <h3>{{ c.name }}</h3>
-                <p>{{ c.description }}</p>
-              </div>
-              <span v-if="data.career?.id === c._id || data.career?._id === c._id" class="current-badge">Active Track</span>
-              <span v-else class="select-badge">Select Track &rarr;</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Reusable Career Track Selector Modal -->
+    <CareerSwitchModal
+      :is-open="isCareerModalOpen"
+      :current-career-id="data.career?.id || data.career?._id || ''"
+      @close="closeCareerModal"
+      @select="selectCareer"
+    />
 
     <!-- Quick Topic Preview Drawer -->
     <SkillPreviewDrawer
@@ -445,6 +397,7 @@ import { useRoute } from 'vue-router';
 import { useRoadmapStore } from '../stores/roadmap';
 import { useUserStore } from '../stores/user';
 import SkillPreviewDrawer from '../components/SkillPreviewDrawer.vue';
+import CareerSwitchModal from '../components/CareerSwitchModal.vue';
 
 const route = useRoute();
 const roadmapStore = useRoadmapStore();
@@ -460,7 +413,6 @@ const loadingCareers = computed(() => roadmapStore.loadingCareers);
 const selectedSkillSlug = ref('');
 const isDrawerOpen = ref(false);
 const isCareerModalOpen = ref(false);
-const filterStreamActive = ref(true);
 
 const viewMode = ref(localStorage.getItem('cg_roadmap_view') || 'canvas');
 
@@ -678,12 +630,15 @@ const contextMenu = reactive({
   visible: false,
   x: 0,
   y: 0,
-  node: null
+  node: null,
+  isLocked: false,
+  lockedReason: ''
 });
 
 async function loadRoadmapData() {
   try {
-    await roadmapStore.fetchRoadmap(route.params.careerId);
+    const careerId = route.params.careerId || route.query.careerId || null;
+    await roadmapStore.fetchRoadmap(careerId);
     await nextTick();
     setTimeout(measureNodePositions, 100);
   } catch (err) {
@@ -775,27 +730,8 @@ function handleQuickStatusClick(node, phaseIndex) {
 }
 
 
-async function loadModalCareers() {
-  try {
-    if (filterStreamActive.value && userStore.userStream) {
-      await roadmapStore.fetchCareers({ stream: userStore.userStream });
-    } else {
-      await roadmapStore.fetchCareers({ all: true });
-    }
-  } catch (err) {
-    console.error('Failed to load careers:', err);
-  }
-}
-
-async function openCareerModal() {
+function openCareerModal() {
   isCareerModalOpen.value = true;
-  filterStreamActive.value = true;
-  await loadModalCareers();
-}
-
-async function toggleStreamFilter() {
-  filterStreamActive.value = !filterStreamActive.value;
-  await loadModalCareers();
 }
 
 function closeCareerModal() {
@@ -853,22 +789,26 @@ async function setStatus(node, targetStatus) {
   }
 }
 
-function openContextMenu(event, node) {
+function openContextMenu(event, node, phaseIndex = 0) {
   contextMenu.visible = true;
   contextMenu.x = event.clientX;
   contextMenu.y = event.clientY;
   contextMenu.node = node;
+  contextMenu.isLocked = isNodeLocked(node, phaseIndex);
+  contextMenu.lockedReason = resolveLockedReason(node, phaseIndex);
 }
 
 function closeContextMenu() {
   contextMenu.visible = false;
   contextMenu.node = null;
+  contextMenu.isLocked = false;
+  contextMenu.lockedReason = '';
 }
 
 function selectMenuStatus(targetStatus) {
   if (contextMenu.node) {
-    if (contextMenu.node.isLocked) {
-      triggerToast(`🔒 ${contextMenu.node.lockedReason}`);
+    if (contextMenu.isLocked) {
+      triggerToast(`🔒 ${contextMenu.lockedReason}`);
       closeContextMenu();
       return;
     }
@@ -1653,122 +1593,6 @@ function badgeClass(status, isLocked) {
 .context-item.active { font-weight: 700; color: var(--accent); }
 
 /* Career Modal */
-.career-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-}
-.career-modal-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 600px;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-.career-modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-.career-modal-header h2 { font-size: 1.3rem; margin: 0 0 0.2rem; }
-.career-modal-header p { font-size: 0.85rem; color: var(--text-dim); margin: 0; }
-.close-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text-dim);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-.modal-filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  font-size: 0.82rem;
-  color: var(--text);
-}
-.btn-toggle-filter {
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.8rem;
-  text-decoration: underline;
-  padding: 0;
-}
-.modal-empty-tracks {
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-.loading-careers { padding: 3rem 1.5rem; text-align: center; color: var(--text-dim); }
-.career-grid {
-  padding: 1.25rem 1.5rem;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.9rem;
-}
-.career-card-item {
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  border-radius: 12px;
-  padding: 1rem;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 0.75rem;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-.career-card-item:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-.career-card-item.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-.career-card-content h3 { font-size: 1rem; margin: 0 0 0.35rem; color: var(--text); }
-.career-card-content p { font-size: 0.8rem; color: var(--text-dim); margin: 0; line-height: 1.35; }
-.current-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--surface);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  align-self: flex-start;
-}
-.select-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-.career-card-item:hover .select-badge { color: var(--accent); }
-
 .spinner {
   width: 10px;
   height: 10px;

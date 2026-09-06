@@ -27,6 +27,19 @@ exports.updateOnboarding = async (req, res, next) => {
     } else if (step === 4) {
       const career = await Career.findById(data.careerId);
       if (!career) return res.status(404).json({ message: 'Career not found' });
+
+      // If user selected a career belonging to another stream, dynamically sync preference
+      if (career.streams && career.streams.length > 0 && profile && profile.education) {
+        const userStream = profile.education.field;
+        const streamMatches = career.streams.some(
+          (s) => s.toLowerCase() === (userStream || '').trim().toLowerCase()
+        );
+        if (!streamMatches && career.streams[0]) {
+          profile.education.field = career.streams[0];
+          await profile.save();
+        }
+      }
+
       user.targetCareer = career._id;
       user.onboardingComplete = true;
       await user.save();
@@ -45,6 +58,18 @@ exports.updateTargetCareer = async (req, res, next) => {
     const { careerId } = req.body;
     const career = await Career.findById(careerId);
     if (!career) return res.status(404).json({ message: 'Career not found' });
+
+    const profile = await UserProfile.findOne({ user: req.user._id });
+    if (career.streams && career.streams.length > 0 && profile && profile.education) {
+      const userStream = profile.education.field;
+      const streamMatches = career.streams.some(
+        (s) => s.toLowerCase() === (userStream || '').trim().toLowerCase()
+      );
+      if (!streamMatches && career.streams[0]) {
+        profile.education.field = career.streams[0];
+        await profile.save();
+      }
+    }
 
     req.user.targetCareer = career._id;
     await req.user.save();

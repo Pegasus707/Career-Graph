@@ -5,8 +5,7 @@ const Skill = require('../models/Skill');
 const CourseProgress = require('../models/CourseProgress');
 const LessonProgress = require('../models/LessonProgress');
 const UserProfile = require('../models/UserProfile');
-const { buildRoadmap } = require('../services/skillGapService');
-const { computeUnlockedPhases } = require('./roadmapController');
+const { buildRoadmap, computeUnlockedPhases } = require('../services/skillGapService');
 
 async function recalculateCourseProgress(userId, courseId) {
   const course = await Course.findById(courseId).populate('skill');
@@ -68,8 +67,24 @@ exports.completeLesson = async (req, res, next) => {
     }
 
     const course = await Course.findById(courseId).populate('skill');
-    const skillObjectId = course && course.skill ? course.skill._id : null;
-    const skillIdStr = course && course.skill ? (course.skill.skillId || course.skill.slug) : null;
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    const skillObjectId = course.skill ? course.skill._id : null;
+    const skillIdStr = course.skill ? (course.skill.skillId || course.skill.slug) : null;
+
+    // Prevent lesson completion if the parent skill is locked in user's roadmap
+    if (req.user.targetCareer && skillObjectId) {
+      const rawRoadmap = await buildRoadmap(req.user._id, req.user.targetCareer);
+      const roadmap = computeUnlockedPhases(rawRoadmap);
+      const skillNode = (roadmap.nodes || []).find(
+        (n) => n.skillId.toString() === skillObjectId.toString() ||
+               (skillIdStr && (n.slug === skillIdStr || n.explicitSkillId === skillIdStr))
+      );
+      if (skillNode && skillNode.isLocked) {
+        return res.status(400).json({
+          message: skillNode.lockedReason || 'Cannot complete lessons for a locked skill. Complete preceding phase prerequisites first!'
+        });
+      }
+    }
 
     await LessonProgress.findOneAndUpdate(
       { user: req.user._id, lesson: lessonId },

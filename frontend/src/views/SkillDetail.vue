@@ -7,10 +7,19 @@
         <span class="skill-category">{{ skill.category }}</span>
         <h1>{{ skill.name }}</h1>
       </div>
-      <span v-if="personalization" class="badge" :class="levelBadgeClass">
-        Your level: {{ levelLabel(personalization.userLevel) }}
+      <span v-if="personalization" class="badge" :class="isLocked ? 'badge-locked' : levelBadgeClass">
+        {{ isLocked ? '🔒 Locked' : 'Your level: ' + levelLabel(personalization.userLevel) }}
       </span>
     </header>
+
+    <!-- Locked Notice Banner -->
+    <div v-if="isLocked" class="locked-banner">
+      <span class="locked-banner-icon">🔒</span>
+      <div class="locked-banner-content">
+        <strong>Skill Curriculum Locked</strong>
+        <p>{{ lockedReason || 'Complete preceding phase prerequisites to unlock this skill.' }}</p>
+      </div>
+    </div>
 
     <section class="card">
       <h2>What is {{ skill.name }}?</h2>
@@ -25,8 +34,8 @@
         <div><span class="req-label">Your level</span><strong>{{ levelLabel(personalization.userLevel) }}</strong></div>
         <div>
           <span class="req-label">Status</span>
-          <strong :class="meetsRequirement ? 'status-good' : 'status-pending'">
-            {{ meetsRequirement ? 'Requirement met' : 'Keep learning' }}
+          <strong :class="isLocked ? 'status-locked' : meetsRequirement ? 'status-good' : 'status-pending'">
+            {{ isLocked ? 'Locked' : meetsRequirement ? 'Requirement met' : 'Keep learning' }}
           </strong>
         </div>
       </div>
@@ -57,10 +66,11 @@
           <div v-for="mod in level.modules" :key="mod.title" class="module-block">
             <ul class="lesson-list">
               <li v-for="lesson in mod.lessons" :key="lesson._id" class="lesson-item">
-                <label class="lesson-check">
+                <label class="lesson-check" :class="{ 'lesson-disabled': isLocked }">
                   <input
                     type="checkbox"
                     :checked="completedIds.has(lesson._id)"
+                    :disabled="isLocked"
                     @change="toggleLesson(lesson._id, level._id, $event.target.checked)"
                   />
                   <span :class="{ 'lesson-done': completedIds.has(lesson._id) }">{{ lesson.title }}</span>
@@ -120,6 +130,8 @@ const course = ref(null);
 const levels = ref([]);
 const courseProgress = ref(0);
 const personalization = ref(null);
+const isLocked = ref(false);
+const lockedReason = ref('');
 const completedIds = ref(new Set());
 
 async function load() {
@@ -130,12 +142,22 @@ async function load() {
   levels.value = data.levels || [];
   courseProgress.value = data.courseProgress || 0;
   personalization.value = data.personalization;
+  isLocked.value = !!data.isLocked;
+  lockedReason.value = data.lockedReason || '';
   completedIds.value = new Set(data.completedLessonIds || []);
   loading.value = false;
 }
 
 onMounted(load);
-watch(() => route.params.slug, load);
+watch(
+  () => route.params.slug,
+  (newSlug) => {
+    if (newSlug) {
+      load();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+);
 
 const LEVEL_LABELS = ['None', 'Beginner', 'Know a little basics', 'Know everything', 'Know everything'];
 function levelLabel(n) {
@@ -148,6 +170,10 @@ const meetsRequirement = computed(
 const levelBadgeClass = computed(() => (meetsRequirement.value ? 'badge-done' : 'badge-progress'));
 
 async function toggleLesson(lessonId, levelId, checked) {
+  if (isLocked.value) {
+    alert(lockedReason.value || 'Cannot complete lessons for a locked skill. Complete preceding phase prerequisites first!');
+    return;
+  }
   const action = checked ? 'complete' : 'uncomplete';
   const { data } = await api.put(`/progress/lesson/${lessonId}/${action}`, {
     levelId,
@@ -243,4 +269,24 @@ async function toggleLesson(lessonId, levelId, checked) {
 }
 .resource-title { flex: 1; font-size: 0.9rem; }
 .resource-provider { font-size: 0.8rem; color: var(--text-dim); }
+
+.locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  color: #ef4444;
+}
+.locked-banner-icon { font-size: 1.5rem; }
+.locked-banner-content strong { display: block; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.locked-banner-content p { margin: 0; font-size: 0.85rem; color: var(--text-dim); }
+
+.badge-locked { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.status-locked { color: #ef4444; }
+
+.lesson-disabled { opacity: 0.55; cursor: not-allowed !important; }
+.lesson-disabled input { cursor: not-allowed !important; }
 </style>

@@ -155,27 +155,34 @@
         <h2>What do you want to become?</h2>
         <p>We'll compare this career's required skills against what you already know.</p>
 
-        <div v-if="education.field" class="stream-info-badge">
-          <span v-if="!showingAllTracks">
-            🎓 Filtered for stream: <strong>{{ education.field }}</strong>
-          </span>
-          <span v-else>
-            🌐 Showing all available career tracks
-          </span>
-          <button type="button" class="btn-clear-filter" @click="toggleStreamFilter">
-            {{ showingAllTracks ? `Filter by ${education.field}` : 'Show all tracks' }}
+        <div class="stream-info-badge">
+          <div class="stream-badge-info">
+            <span v-if="!showingAllTracks && education.field">
+              🎓 Recommended for: <strong>{{ education.field }}</strong>
+            </span>
+            <span v-else>
+              🌐 All Available Career Tracks ({{ careers.length }})
+            </span>
+          </div>
+          <button
+            v-if="education.field"
+            type="button"
+            class="btn-toggle-stream"
+            @click="toggleShowAllTracks"
+          >
+            {{ showingAllTracks ? `Show ${education.field} only` : 'Browse all tracks →' }}
           </button>
         </div>
 
         <div v-if="roadmapStore.loadingCareers" class="loading-box">
           <span class="loading-spinner"></span>
-          <p>Loading matching career tracks…</p>
+          <p>Loading career tracks…</p>
         </div>
 
         <div v-else-if="careers.length === 0" class="empty-careers-hint">
-          <p>No tracks specifically matched "<strong>{{ education.field }}</strong>".</p>
-          <button type="button" class="btn btn-secondary btn-sm" @click="toggleStreamFilter">
-            Browse all available tracks
+          <p>No tracks specifically categorized under "<strong>{{ education.field }}</strong>".</p>
+          <button type="button" class="btn btn-secondary btn-sm" @click="toggleShowAllTracks">
+            Browse All Available Career Tracks
           </button>
         </div>
 
@@ -188,8 +195,18 @@
             :class="{ active: targetCareer === c._id }"
             @click="targetCareer = c._id"
           >
-            <strong>{{ c.name }}</strong>
+            <div class="career-card-top">
+              <strong>{{ c.name }}</strong>
+              <span v-if="c.category" class="category-pill">{{ c.category }}</span>
+            </div>
             <span>{{ c.description }}</span>
+          </button>
+        </div>
+
+        <div v-if="!showingAllTracks && careers.length > 0" class="browse-more-hint">
+          <span>Looking for a different track?</span>
+          <button type="button" class="link-btn" @click="toggleShowAllTracks">
+            Explore all available roadmaps
           </button>
         </div>
       </section>
@@ -230,16 +247,16 @@ const loading = ref(false);
 const error = ref('');
 
 // Step 1
-const fieldOptions = [
+const fieldOptions = ref([
   'Computer Science',
   'DevOps & Cloud Engineering',
   'AI & Data Science'
-];
+]);
 
 const initialStream = userStore.userStream || 'Computer Science';
 const education = ref({
   degree: userStore.userDegree || '',
-  field: fieldOptions.includes(initialStream) ? initialStream : 'Computer Science',
+  field: initialStream,
   gradYear: null,
   stillStudying: false
 });
@@ -291,16 +308,16 @@ const extraSelectedSkills = computed(() => {
 });
 
 function isSkillSelected(skillId) {
-  return userSkills.value.some((r) => r.skill === skillId);
+  return userSkills.value.some((r) => r.skill?.toString() === skillId?.toString());
 }
 
 function getSkillLevel(skillId) {
-  const row = userSkills.value.find((r) => r.skill === skillId);
+  const row = userSkills.value.find((r) => r.skill?.toString() === skillId?.toString());
   return row ? row.level : 1;
 }
 
 function setSkillLevel(skillId, level) {
-  const row = userSkills.value.find((r) => r.skill === skillId);
+  const row = userSkills.value.find((r) => r.skill?.toString() === skillId?.toString());
   if (row) {
     row.level = level;
   }
@@ -317,22 +334,24 @@ function toggleFieldSkill(skill) {
 const filteredSkills = computed(() => {
   if (!skillQuery.value.trim()) return [];
   const q = skillQuery.value.toLowerCase();
-  const already = new Set(userSkills.value.map((r) => r.skill));
-  return allSkills.value.filter((s) => s.name.toLowerCase().includes(q) && !already.has(s._id)).slice(0, 6);
+  const already = new Set(userSkills.value.map((r) => r.skill?.toString()));
+  return allSkills.value.filter((s) => s.name?.toLowerCase().includes(q) && !already.has(s._id?.toString())).slice(0, 6);
 });
 
 function skillName(id) {
-  const s = allSkills.value.find((sk) => sk._id === id);
+  const s = allSkills.value.find((sk) => sk._id?.toString() === id?.toString());
   return s ? s.name : '';
 }
 
 function addSkill(skill) {
-  userSkills.value.push({ skill: skill._id, level: 1 });
+  if (!isSkillSelected(skill._id)) {
+    userSkills.value.push({ skill: skill._id, level: 1 });
+  }
   skillQuery.value = '';
 }
 
 function removeSkill(id) {
-  userSkills.value = userSkills.value.filter((r) => r.skill !== id);
+  userSkills.value = userSkills.value.filter((r) => r.skill?.toString() !== id?.toString());
 }
 
 // Step 4
@@ -355,18 +374,54 @@ async function loadCareers() {
   }
 }
 
-async function toggleStreamFilter() {
+async function toggleShowAllTracks() {
   showingAllTracks.value = !showingAllTracks.value;
   await loadCareers();
 }
 
 onMounted(async () => {
   try {
-    const [skillsRes] = await Promise.all([
+    const [skillsRes, streamsRes] = await Promise.all([
       api.get('/skills'),
+      api.get('/careers/streams').catch(() => ({ data: { streams: [] } })),
       loadCareers()
     ]);
-    allSkills.value = skillsRes.data.skills;
+    allSkills.value = skillsRes.data.skills || [];
+    if (streamsRes.data?.streams?.length) {
+      fieldOptions.value = streamsRes.data.streams;
+      if (!fieldOptions.value.includes(education.value.field)) {
+        education.value.field = fieldOptions.value[0];
+      }
+    }
+
+    // Prefill existing user profile info if returning to onboarding
+    try {
+      const profileData = await userStore.fetchProfile();
+      if (profileData.profile?.education) {
+        const edu = profileData.profile.education;
+        if (edu.degree) education.value.degree = edu.degree;
+        if (edu.field) education.value.field = edu.field;
+        if (edu.gradYear) education.value.gradYear = edu.gradYear;
+        if (typeof edu.stillStudying === 'boolean') education.value.stillStudying = edu.stillStudying;
+      }
+      if (profileData.profile?.status) {
+        status.value = profileData.profile.status;
+      }
+      if (profileData.profile?.jobTitle) {
+        jobTitle.value = profileData.profile.jobTitle;
+      }
+      if (profileData.skills?.length && userSkills.value.length === 0) {
+        userSkills.value = profileData.skills.map((s) => ({
+          skill: s.skill?._id || s.skill,
+          level: s.level || 1
+        }));
+      }
+      if (profileData.targetCareer?._id || profileData.targetCareer) {
+        targetCareer.value = profileData.targetCareer._id || profileData.targetCareer;
+      }
+    } catch (e) {
+      // New registration without prior profile
+    }
   } catch (err) {
     console.error('Failed to initialize onboarding data:', err);
   }
@@ -374,7 +429,6 @@ onMounted(async () => {
 
 watch(step, (newStep) => {
   if (newStep === 4) {
-    showingAllTracks.value = false;
     loadCareers();
   }
 });
@@ -406,18 +460,16 @@ async function nextStep() {
       await saveStep(1, education.value);
       userStore.setDegreePreference(education.value.degree);
       userStore.setStreamPreference(education.value.field);
-      showingAllTracks.value = false;
       await loadCareers();
     }
     if (step.value === 2) await saveStep(2, { status: status.value, jobTitle: jobTitle.value });
     if (step.value === 3) {
       await saveStep(3, { skills: userSkills.value });
-      showingAllTracks.value = false;
       await loadCareers();
     }
     step.value += 1;
   } catch (e) {
-    /* error already set */
+    console.error('Failed to advance step:', e);
   }
 }
 
@@ -427,13 +479,22 @@ function prevStep() {
 
 async function finish() {
   try {
-    await saveStep(4, { careerId: targetCareer.value });
-    await userStore.updateTargetCareer(targetCareer.value);
+    loading.value = true;
+    error.value = '';
+    const { data } = await api.put('/users/onboarding', {
+      step: 4,
+      data: { careerId: targetCareer.value }
+    });
+    if (data.user) {
+      auth.setSession(auth.token, data.user);
+    }
     await userStore.fetchProfile();
-    await auth.refreshUser();
+    await roadmapStore.fetchDashboardProgress();
     router.push('/dashboard');
-  } catch (e) {
-    /* error already set */
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not complete onboarding. Please try again.';
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -455,22 +516,70 @@ async function finish() {
   align-items: center;
   justify-content: space-between;
   margin-top: 1rem;
-  padding: 0.6rem 0.9rem;
+  padding: 0.65rem 1rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.85rem;
   color: var(--text);
+  gap: 0.75rem;
 }
-.btn-clear-filter {
+.btn-toggle-stream {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.btn-toggle-stream:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.career-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.category-pill {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.browse-more-hint {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.link-btn {
   background: transparent;
   border: none;
   color: var(--accent);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
+}
+.link-btn:hover {
+  color: var(--text);
 }
 .empty-careers-hint {
   margin-top: 1.5rem;

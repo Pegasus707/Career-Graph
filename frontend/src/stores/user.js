@@ -123,6 +123,9 @@ export const useUserStore = defineStore('user', {
       try {
         const { data } = await api.put('/users/target-career', { careerId });
         this.targetCareer = data.career || null;
+        if (data.career?.streams?.[0]) {
+          this.setStreamPreference(data.career.streams[0]);
+        }
         return data;
       } catch (err) {
         this.error = err.response?.data?.message || 'Failed to update target career';
