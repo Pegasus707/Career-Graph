@@ -32,6 +32,8 @@ html, body {
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 h1, h2, h3, h4 {
@@ -123,6 +125,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .progress-track {

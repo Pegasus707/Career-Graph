@@ -428,6 +428,7 @@ onMounted(async () => {
 });
 
 watch(step, (newStep) => {
+  window.scrollTo({ top: 0, behavior: 'instant' });
   if (newStep === 4) {
     loadCareers();
   }
@@ -501,15 +502,34 @@ async function finish() {
 </script>
 
 <style scoped>
-.onboarding { padding: 3rem 1.5rem; max-width: 640px; }
+.onboarding {
+  padding: 2.5rem 1.5rem 4rem;
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
 .onboarding-header { margin-bottom: 1.5rem; }
 .step-label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 0.5rem; font-weight: 600; }
-.step-card { min-height: 360px; display: flex; flex-direction: column; }
+.step-card {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+}
 .step-card h2 { font-size: 1.4rem; }
 
 .checkbox-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-dim); }
 
-.option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
 
 .stream-info-badge {
   display: flex;
@@ -523,6 +543,8 @@ async function finish() {
   font-size: 0.85rem;
   color: var(--text);
   gap: 0.75rem;
+  flex-wrap: wrap;
+  box-sizing: border-box;
 }
 .btn-toggle-stream {
   background: transparent;
@@ -542,10 +564,11 @@ async function finish() {
 }
 .career-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
 }
 .category-pill {
   font-size: 0.68rem;
@@ -556,6 +579,7 @@ async function finish() {
   color: var(--accent);
   font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .browse-more-hint {
   margin-top: 1.25rem;
@@ -649,12 +673,14 @@ async function finish() {
 .level-select { width: 150px; }
 .field-skills-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   margin-top: 1.25rem;
   max-height: 380px;
   overflow-y: auto;
   padding-right: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .field-skill-card {
@@ -668,6 +694,8 @@ async function finish() {
   border-radius: 10px;
   transition: all 0.15s ease;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  box-sizing: border-box;
 }
 .field-skill-card:hover {
   border-color: var(--accent);
@@ -688,12 +716,19 @@ async function finish() {
   font-weight: 600;
   color: var(--text);
   user-select: none;
+  min-width: 0;
+}
+.skill-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .skill-checkbox-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .skill-level-wrapper {
@@ -769,7 +804,7 @@ async function finish() {
 
 .step-actions { display: flex; align-items: center; margin-top: 2rem; }
 
-@media (max-width: 600px) {
+@media (max-width: 680px) {
   .option-grid { grid-template-columns: 1fr; }
   .field-skills-grid { grid-template-columns: 1fr; }
   .selected-skill-row { flex-wrap: wrap; }

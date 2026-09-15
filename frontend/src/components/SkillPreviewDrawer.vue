@@ -40,27 +40,6 @@
               </div>
             </div>
 
-            <!-- Proof of Skill Action Banner -->
-            <div class="proof-card" :class="{ 'is-verified': isVerified }">
-              <div class="proof-content">
-                <span class="proof-badge-icon">{{ isVerified ? '🛡️' : '📝' }}</span>
-                <div class="proof-text">
-                  <h4 class="proof-title">{{ isVerified ? 'Skill Verified' : 'Validate Skill Knowledge' }}</h4>
-                  <p class="proof-desc">
-                    {{ isVerified ? 'You passed the validation quiz and verified this skill.' : 'Pass the 3-question quiz (at least 2/3 correct) to earn the Verified Badge!' }}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                class="btn proof-action-btn"
-                :class="isVerified ? 'btn-secondary' : 'btn-primary'"
-                @click="$emit('open-quiz', { skill, isCompleted, courseProgress })"
-              >
-                {{ isVerified ? 'Retake Quiz 🔄' : 'Take Quiz to Verify 🛡️' }}
-              </button>
-            </div>
-
             <!-- Description -->
             <section class="drawer-section">
               <h3>Overview</h3>
@@ -80,7 +59,10 @@
 
               <div class="levels-container">
                 <div v-for="level in levels" :key="level._id" class="level-group">
-                  <h4 class="level-name">{{ level.name }}</h4>
+                  <div class="level-header-row">
+                    <h4 class="level-name">{{ level.name }}</h4>
+                    <span v-if="level.name === 'Advanced'" class="level-phase-tag">Verification Gate</span>
+                  </div>
                   <div v-for="mod in level.modules" :key="mod.title" class="module-group">
                     <ul class="lesson-list">
                       <li v-for="lesson in mod.lessons" :key="lesson._id" class="lesson-item">
@@ -95,6 +77,38 @@
                       </li>
                     </ul>
                   </div>
+                </div>
+              </div>
+
+              <!-- Proof of Skill Action Banner (Visible only when user reaches the Advanced phase or is already verified) -->
+              <div v-if="hasReachedAdvanced || isVerified" class="proof-card" :class="{ 'is-verified': isVerified }">
+                <div class="proof-content">
+                  <span class="proof-badge-icon">{{ isVerified ? '🛡️' : '🎓' }}</span>
+                  <div class="proof-text">
+                    <h4 class="proof-title">{{ isVerified ? 'Skill Verified' : 'Advanced Phase Reached!' }}</h4>
+                    <p class="proof-desc">
+                      {{ isVerified ? 'You passed the validation quiz and earned the Verified Badge.' : 'You’ve reached the Advanced phase! Pass the 3-question quiz (at least 2/3 correct) to earn your official 🛡️ Verified Badge.' }}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="btn proof-action-btn"
+                  :class="isVerified ? 'btn-secondary' : 'btn-primary'"
+                  @click="$emit('open-quiz', { skill, isCompleted, courseProgress })"
+                >
+                  {{ isVerified ? 'Retake Quiz 🔄' : 'Take Quiz to Verify 🛡️' }}
+                </button>
+              </div>
+
+              <!-- Locked notice when user has not yet reached Advanced phase -->
+              <div v-else class="proof-locked-notice">
+                <span class="proof-locked-icon">🔒</span>
+                <div class="proof-locked-text">
+                  <span class="proof-locked-title">Proof of Skill Quiz Locked</span>
+                  <p class="proof-locked-desc">
+                    Complete the Beginner and Intermediate lessons above to reach the Advanced phase and unlock the 3-question verification quiz.
+                  </p>
                 </div>
               </div>
             </section>
@@ -162,6 +176,44 @@ function levelLabel(n) {
 const meetsRequirement = computed(
   () => personalization.value && personalization.value.userLevel >= 3
 );
+
+/**
+ * Checks if user has progressed to Advanced phase:
+ * 1. Already verified.
+ * 2. Onboarding/profile declared userLevel >= 3.
+ * 3. Course progress >= 66%.
+ * 4. All Beginner and Intermediate level lessons checked.
+ */
+const hasReachedAdvanced = computed(() => {
+  if (isVerified.value) return true;
+  if (personalization.value && personalization.value.userLevel >= 3) return true;
+  if (courseProgress.value >= 66) return true;
+
+  if (levels.value && levels.value.length > 0) {
+    const nonAdvancedLevels = levels.value.filter((lvl) => lvl.name !== 'Advanced');
+    if (nonAdvancedLevels.length === 0) return true;
+
+    let totalNonAdvanced = 0;
+    let completedNonAdvanced = 0;
+
+    for (const lvl of nonAdvancedLevels) {
+      for (const mod of lvl.modules || []) {
+        for (const lesson of mod.lessons || []) {
+          totalNonAdvanced++;
+          if (completedIds.value.has(lesson._id)) {
+            completedNonAdvanced++;
+          }
+        }
+      }
+    }
+
+    if (totalNonAdvanced > 0 && completedNonAdvanced >= totalNonAdvanced) {
+      return true;
+    }
+  }
+
+  return false;
+});
 
 // Shared Skill Reflection: Check if skill is completed across any track in userStore
 const isGloballyCompleted = computed(() => {
@@ -282,6 +334,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media (max-width: 580px) {
+  .drawer-panel {
+    max-width: 100%;
+  }
 }
 
 .drawer-header {
@@ -333,19 +392,22 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 1.5rem;
+  padding-bottom: 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  box-sizing: border-box;
 }
 
 .requirement-banner {
-  display: flex;
-  gap: 1.25rem;
-  padding: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  flex-wrap: wrap;
+  box-sizing: border-box;
 }
 .requirement-banner > div {
   display: flex;
@@ -384,13 +446,32 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
+.level-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
 .level-name {
   font-size: 0.85rem;
   color: var(--accent);
-  margin-bottom: 0.4rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  margin: 0;
+}
+
+.level-phase-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .lesson-list {
@@ -444,6 +525,8 @@ onUnmounted(() => {
   color: var(--text);
   font-size: 0.85rem;
   transition: border-color 0.15s ease, transform 0.12s ease;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .resource-link:hover {
   border-color: var(--accent);
@@ -457,10 +540,12 @@ onUnmounted(() => {
   font-weight: 700;
   color: var(--accent);
   min-width: 65px;
+  flex-shrink: 0;
 }
 
 .resource-title {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -486,16 +571,55 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding: 1rem 1.15rem;
+  padding: 1.1rem 1.25rem;
   background: #f8fafc;
   border: 1.5px solid #e2e8f0;
   border-radius: 12px;
   transition: all 0.2s ease;
+  margin-top: 1.25rem;
+  box-sizing: border-box;
 }
 
 .proof-card.is-verified {
   background: #f0fdf4;
   border-color: #86efac;
+}
+
+.proof-locked-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  margin-top: 1.25rem;
+  box-sizing: border-box;
+}
+
+.proof-locked-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.proof-locked-text {
+  flex: 1;
+}
+
+.proof-locked-title {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.2rem;
+}
+
+.proof-locked-desc {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.45;
 }
 
 .proof-content {

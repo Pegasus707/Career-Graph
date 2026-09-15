@@ -9,6 +9,59 @@ const UserProfile = require('../models/UserProfile');
 const { buildRoadmap, computeUnlockedPhases } = require('../services/skillGapService');
 
 /**
+ * Helper to determine if a user has reached the Advanced phase for a skill.
+ * Conditions:
+ * 1. User is already verified or profile declared level >= 3 (Advanced/Expert).
+ * 2. Course progress is >= 66%.
+ * 3. All Beginner & Intermediate lessons have been completed.
+ */
+async function hasReachedAdvancedPhase(userId, skill) {
+  const profile = await UserProfile.findOne({ user: userId });
+  const userSkill = profile && profile.skills
+    ? profile.skills.find(
+        (s) => s.skill && (s.skill._id ? s.skill._id.toString() : s.skill.toString()) === skill._id.toString()
+      )
+    : null;
+
+  if (userSkill && (userSkill.level >= 3 || userSkill.verified)) {
+    return true;
+  }
+
+  const course = await Course.findOne({ skill: skill._id });
+  if (!course) return true; // No course curriculum restrictions
+
+  const progressDoc = await CourseProgress.findOne({ user: userId, course: course._id });
+  if (progressDoc && (progressDoc.verified || progressDoc.percent >= 66)) {
+    return true;
+  }
+
+  const nonAdvancedLevels = await Level.find({
+    course: course._id,
+    name: { $in: ['Beginner', 'Intermediate'] }
+  });
+
+  if (nonAdvancedLevels.length === 0) return true;
+
+  const requiredLessonIds = [];
+  nonAdvancedLevels.forEach((lvl) => {
+    (lvl.modules || []).forEach((mod) => {
+      (mod.lessons || []).forEach((l) => {
+        requiredLessonIds.push(l._id);
+      });
+    });
+  });
+
+  if (requiredLessonIds.length === 0) return true;
+
+  const completedCount = await LessonProgress.countDocuments({
+    user: userId,
+    lesson: { $in: requiredLessonIds }
+  });
+
+  return completedCount >= requiredLessonIds.length;
+}
+
+/**
  * Fetch 3-question validation quiz for a skill.
  * Sanitizes payload: strictly strips correctIndex and explanations so answer keys are not exposed.
  */
@@ -41,6 +94,14 @@ exports.getSkillQuiz = async (req, res, next) => {
           message: node.lockedReason || 'This skill is currently locked. Complete preceding prerequisites before taking the verification quiz.'
         });
       }
+    }
+
+    // Verify that user has reached the Advanced phase before unlocking the quiz
+    const isAdvanced = await hasReachedAdvancedPhase(userId, skill);
+    if (!isAdvanced) {
+      return res.status(400).json({
+        message: 'You must reach the Advanced phase (complete Beginner and Intermediate lessons) before taking the verification quiz.'
+      });
     }
 
     const quiz = await SkillQuiz.findOne({
@@ -103,6 +164,14 @@ exports.submitSkillQuiz = async (req, res, next) => {
 
     if (!quiz || !quiz.questions || quiz.questions.length < 3) {
       return res.status(404).json({ message: 'Quiz not found for this skill' });
+    }
+
+    // Enforce that user must have reached the Advanced phase before submitting
+    const isAdvanced = await hasReachedAdvancedPhase(userId, skill);
+    if (!isAdvanced) {
+      return res.status(400).json({
+        message: 'You must reach the Advanced phase (complete Beginner and Intermediate lessons) before submitting the verification quiz.'
+      });
     }
 
     // Grade server-side

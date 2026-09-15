@@ -820,6 +820,12 @@ const NEXT_STATUS = {
 async function cycleStatus(node) {
   const next = NEXT_STATUS[node.status] || 'in_progress';
   if (next === 'completed') {
+    const isAdvancedOrVerified = node.verified || (node.percent && node.percent >= 66) || (node.userLevel && node.userLevel >= 3);
+    if (!isAdvancedOrVerified) {
+      triggerToast(`📚 Complete lessons up to the Advanced phase in ${node.name} before taking the Verification Quiz!`);
+      openDrawer(node.slug);
+      return;
+    }
     openQuizModal(node);
     return;
   }
@@ -864,6 +870,12 @@ function selectMenuStatus(targetStatus) {
     if (targetStatus === 'completed') {
       const targetNode = contextMenu.node;
       closeContextMenu();
+      const isAdvancedOrVerified = targetNode.verified || (targetNode.percent && targetNode.percent >= 66) || (targetNode.userLevel && targetNode.userLevel >= 3);
+      if (!isAdvancedOrVerified) {
+        triggerToast(`📚 Complete lessons up to the Advanced phase in ${targetNode.name} before taking the Verification Quiz!`);
+        openDrawer(targetNode.slug);
+        return;
+      }
       openQuizModal(targetNode);
       return;
     }
@@ -926,31 +938,32 @@ function badgeClass(status, isLocked, isVerified) {
   display: flex;
   align-items: center;
   gap: 1rem;
+  gap: 0.85rem;
   flex-wrap: wrap;
 }
 
 .view-mode-toggle {
   display: flex;
   background: var(--surface-2);
+  padding: 4px;
+  border-radius: 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px;
-  gap: 3px;
+  gap: 4px;
 }
 
 .btn-toggle-view {
   background: transparent;
   border: none;
-  color: var(--text-dim);
-  padding: 0.45rem 0.95rem;
-  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
   font-size: 0.82rem;
   font-weight: 600;
+  color: var(--text-dim);
+  border-radius: 7px;
   cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
 }
 
 .btn-toggle-view:hover {
@@ -958,8 +971,103 @@ function badgeClass(status, isLocked, isVerified) {
 }
 
 .btn-toggle-view.active {
-  background: var(--accent);
-  color: #ffffff;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  font-weight: 700;
+}
+
+/* Toast Lock Alert */
+.toast-lock-banner {
+  margin-top: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  animation: slideDown 0.25s ease-out;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: #b91c1c;
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Common Context Menu */
+.canvas-context-menu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.15);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 170px;
+  z-index: 1000;
+  animation: menuFadeIn 0.15s ease-out;
+}
+
+.ctx-btn {
+  background: transparent;
+  border: none;
+  padding: 0.55rem 0.85rem;
+  text-align: left;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.12s ease;
+}
+
+.ctx-btn:hover {
+  background: var(--surface-2);
+}
+
+.ctx-btn.ctx-done:hover {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.ctx-btn.ctx-progress:hover {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.ctx-btn.ctx-todo:hover {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.ctx-locked-hint {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  color: #ef4444;
+  background: #fee2e2;
+  border-radius: 6px;
+  margin-top: 0.2rem;
+}
+
+.btn-generate {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
 }
 
@@ -975,15 +1083,18 @@ function badgeClass(status, isLocked, isVerified) {
 .canvas-view-container {
   margin-top: 1.5rem;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .canvas-viewport {
   position: relative;
   width: 100%;
-  height: 740px;
+  height: clamp(520px, 72vh, 760px);
   border-radius: 20px;
   border: 1.5px solid var(--border);
   overflow: hidden;
+  box-sizing: border-box;
   background-color: #f8fafc;
   background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
   background-size: 24px 24px;
@@ -998,16 +1109,18 @@ function badgeClass(status, isLocked, isVerified) {
 
 .canvas-hud {
   position: absolute;
-  top: 1.1rem;
-  left: 1.25rem;
-  right: 1.25rem;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   pointer-events: none;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+  max-width: calc(100% - 2rem);
+  box-sizing: border-box;
 }
 
 .hud-left {
