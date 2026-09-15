@@ -14,7 +14,9 @@ const Level = require('../models/Level');
 const CourseProgress = require('../models/CourseProgress');
 const LessonProgress = require('../models/LessonProgress');
 const UserProfile = require('../models/UserProfile');
+const SkillQuiz = require('../models/SkillQuiz');
 const { skillsData, careersData } = require('./seedData');
+const { quizzesData } = require('./seedQuizzes');
 
 async function run() {
   const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/careergraph';
@@ -38,7 +40,8 @@ async function run() {
     Level.deleteMany({}),
     CourseProgress.deleteMany({}),
     LessonProgress.deleteMany({}),
-    UserProfile.deleteMany({}) // profiles reference skill ids that are about to be recreated
+    UserProfile.deleteMany({}), // profiles reference skill ids that are about to be recreated
+    SkillQuiz.deleteMany({})
   ]);
 
   const skillMap = {};
@@ -116,6 +119,19 @@ async function run() {
     });
   }
   console.log(`Created ${careersData.length} careers.`);
+
+  for (const [slug, questions] of Object.entries(quizzesData)) {
+    const skill = skillMap[slug];
+    if (skill) {
+      await SkillQuiz.create({
+        skill: skill._id,
+        skillId: skill.slug,
+        title: `${skill.name} Skill Verification Quiz`,
+        questions
+      });
+    }
+  }
+  console.log(`Created validation quizzes for ${Object.keys(quizzesData).length} skills.`);
 
   console.log('Seed complete.');
   await mongoose.disconnect();

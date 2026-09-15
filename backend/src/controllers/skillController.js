@@ -74,9 +74,13 @@ exports.getSkill = async (req, res, next) => {
 
       let courseProgress = 0;
       let completedLessonIds = [];
+      let isVerified = false;
+      let quizScore = 0;
       if (course) {
         const progressDoc = await CourseProgress.findOne({ user: req.user._id, course: course._id });
         courseProgress = progressDoc ? progressDoc.percent : 0;
+        isVerified = !!((progressDoc && progressDoc.verified) || (userSkill && userSkill.verified));
+        quizScore = progressDoc ? (progressDoc.quizScore || 0) : 0;
         const lessonProgressDocs = await LessonProgress.find({ user: req.user._id, course: course._id });
         completedLessonIds = lessonProgressDocs.map((lp) => lp.lesson.toString());
       }
@@ -86,6 +90,8 @@ exports.getSkill = async (req, res, next) => {
         course,
         levels,
         courseProgress,
+        verified: isVerified,
+        quizScore,
         isLocked,
         lockedReason,
         personalization: { userLevel, requiredLevel, careerName, isLocked, lockedReason },
@@ -93,7 +99,7 @@ exports.getSkill = async (req, res, next) => {
       });
     }
 
-    res.json({ skill, course, levels, courseProgress: 0, isLocked: false, lockedReason: '', personalization: null, completedLessonIds: [] });
+    res.json({ skill, course, levels, courseProgress: 0, verified: false, quizScore: 0, isLocked: false, lockedReason: '', personalization: null, completedLessonIds: [] });
   } catch (err) {
     next(err);
   }

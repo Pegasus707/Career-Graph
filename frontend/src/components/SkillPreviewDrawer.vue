@@ -32,6 +32,33 @@
                   {{ isCompleted ? '✓ Completed' : 'In Progress' }}
                 </span>
               </div>
+              <div>
+                <span class="req-label">Proof of Skill</span>
+                <span class="badge" :class="isVerified ? 'badge-verified' : 'badge-unverified'">
+                  {{ isVerified ? '🛡️ Verified' : 'Unverified' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Proof of Skill Action Banner -->
+            <div class="proof-card" :class="{ 'is-verified': isVerified }">
+              <div class="proof-content">
+                <span class="proof-badge-icon">{{ isVerified ? '🛡️' : '📝' }}</span>
+                <div class="proof-text">
+                  <h4 class="proof-title">{{ isVerified ? 'Skill Verified' : 'Validate Skill Knowledge' }}</h4>
+                  <p class="proof-desc">
+                    {{ isVerified ? 'You passed the validation quiz and verified this skill.' : 'Pass the 3-question quiz (at least 2/3 correct) to earn the Verified Badge!' }}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn proof-action-btn"
+                :class="isVerified ? 'btn-secondary' : 'btn-primary'"
+                @click="$emit('open-quiz', { skill, isCompleted, courseProgress })"
+              >
+                {{ isVerified ? 'Retake Quiz 🔄' : 'Take Quiz to Verify 🛡️' }}
+              </button>
             </div>
 
             <!-- Description -->
@@ -114,7 +141,7 @@ const props = defineProps({
   slug: { type: String, default: '' }
 });
 
-const emit = defineEmits(['close', 'progress-updated']);
+const emit = defineEmits(['close', 'progress-updated', 'open-quiz']);
 const userStore = useUserStore();
 
 const loading = ref(false);
@@ -122,6 +149,8 @@ const skill = ref(null);
 const course = ref(null);
 const levels = ref([]);
 const courseProgress = ref(0);
+const isVerified = ref(false);
+const quizScore = ref(0);
 const personalization = ref(null);
 const completedIds = ref(new Set());
 
@@ -145,7 +174,7 @@ const isGloballyCompleted = computed(() => {
 });
 
 const isCompleted = computed(
-  () => meetsRequirement.value || courseProgress.value === 100 || isGloballyCompleted.value
+  () => isVerified.value || meetsRequirement.value || courseProgress.value === 100 || isGloballyCompleted.value
 );
 
 async function loadSkillData() {
@@ -157,6 +186,8 @@ async function loadSkillData() {
     course.value = data.course;
     levels.value = data.levels || [];
     courseProgress.value = data.courseProgress || 0;
+    isVerified.value = !!data.verified;
+    quizScore.value = data.quizScore || 0;
     personalization.value = data.personalization;
     completedIds.value = new Set(data.completedLessonIds || []);
   } catch (err) {
@@ -448,6 +479,59 @@ onUnmounted(() => {
 
 .btn-full {
   width: 100%;
+}
+
+/* Proof of Skill Card */
+.proof-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.proof-card.is-verified {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.proof-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.proof-badge-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.proof-text {
+  flex: 1;
+}
+
+.proof-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.2rem 0;
+}
+
+.proof-desc {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.proof-action-btn {
+  width: 100%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
 }
 
 /* Animations */

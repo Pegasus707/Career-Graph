@@ -190,6 +190,7 @@
                     <div class="canvas-card-body" @click="handleNodeClick(node, pIndex)">
                       <div class="canvas-card-top">
                         <span v-if="isNodeLocked(node, pIndex)" class="canvas-card-lock">🔒</span>
+                        <span v-else-if="node.verified" class="canvas-card-verified-shield" title="Proof of Skill Verified">🛡️</span>
                         <span class="canvas-card-name">{{ node.name }}</span>
                       </div>
                       <div class="canvas-card-footer">
@@ -199,15 +200,15 @@
                         <button
                           type="button"
                           class="canvas-card-status-pill"
-                          :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, pIndex))"
+                          :class="[badgeClass(resolveNodeStatus(node), isNodeLocked(node, pIndex)), { 'badge-verified': node.verified }]"
                           :disabled="updatingSkillId === node.skillId || isNodeLocked(node, pIndex)"
                           @click.stop="handleQuickStatusClick(node, pIndex)"
-                          :title="isNodeLocked(node, pIndex) ? resolveLockedReason(node, pIndex) : 'Click to cycle status'"
+                          :title="isNodeLocked(node, pIndex) ? resolveLockedReason(node, pIndex) : (node.verified ? 'Verified Skill' : 'Click to cycle status')"
                         >
                           <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
                           <template v-else>
-                            <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
-                            <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
+                            <span class="status-icon">{{ node.verified ? '🛡️' : statusIcon(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
+                            <span class="status-text">{{ node.verified ? 'Verified' : statusLabel(resolveNodeStatus(node), isNodeLocked(node, pIndex)) }}</span>
                           </template>
                         </button>
                       </div>
@@ -279,6 +280,7 @@
                       <div class="skill-node-body" @click="handleNodeClick(node, index)">
                         <div class="skill-node-header-row">
                           <span v-if="isNodeLocked(node, index)" class="lock-icon" title="Locked skill">🔒</span>
+                          <span v-else-if="node.verified" class="verified-shield-icon" title="Proof of Skill Verified">🛡️</span>
                           <span class="skill-node-name">{{ node.name }}</span>
                         </div>
                         <span class="skill-node-pct">
@@ -289,15 +291,15 @@
                       <button
                         type="button"
                         class="quick-status-btn"
-                        :class="badgeClass(resolveNodeStatus(node), isNodeLocked(node, index))"
+                        :class="[badgeClass(resolveNodeStatus(node), isNodeLocked(node, index)), { 'badge-verified': node.verified }]"
                         :disabled="updatingSkillId === node.skillId || isNodeLocked(node, index)"
                         @click.stop="handleQuickStatusClick(node, index)"
-                        :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : 'Quick toggle status'"
+                        :title="isNodeLocked(node, index) ? resolveLockedReason(node, index) : (node.verified ? 'Verified Skill' : 'Quick toggle status')"
                       >
                         <span v-if="updatingSkillId === node.skillId" class="spinner"></span>
                         <template v-else>
-                          <span class="status-icon">{{ statusIcon(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
-                          <span class="status-text">{{ statusLabel(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
+                          <span class="status-icon">{{ node.verified ? '🛡️' : statusIcon(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
+                          <span class="status-text">{{ node.verified ? 'Verified' : statusLabel(resolveNodeStatus(node), isNodeLocked(node, index)) }}</span>
                         </template>
                       </button>
                     </div>
@@ -387,6 +389,15 @@
       :slug="selectedSkillSlug"
       @close="closeDrawer"
       @progress-updated="handleProgressUpdated"
+      @open-quiz="handleDrawerOpenQuiz"
+    />
+
+    <!-- Proof of Skill Validation Quiz Modal -->
+    <SkillQuizModal
+      :is-open="isQuizModalOpen"
+      :skill="quizSkill"
+      @close="closeQuizModal"
+      @verified="handleSkillVerified"
     />
   </main>
 </template>
@@ -398,6 +409,7 @@ import { useRoadmapStore } from '../stores/roadmap';
 import { useUserStore } from '../stores/user';
 import SkillPreviewDrawer from '../components/SkillPreviewDrawer.vue';
 import CareerSwitchModal from '../components/CareerSwitchModal.vue';
+import SkillQuizModal from '../components/SkillQuizModal.vue';
 
 const route = useRoute();
 const roadmapStore = useRoadmapStore();
@@ -413,6 +425,39 @@ const loadingCareers = computed(() => roadmapStore.loadingCareers);
 const selectedSkillSlug = ref('');
 const isDrawerOpen = ref(false);
 const isCareerModalOpen = ref(false);
+
+// Proof of Skill Quiz Modal State
+const isQuizModalOpen = ref(false);
+const quizSkill = ref(null);
+
+function openQuizModal(node) {
+  quizSkill.value = {
+    _id: node.skillId,
+    skillId: node.explicitSkillId || node.slug,
+    slug: node.slug,
+    name: node.name,
+    verified: node.verified
+  };
+  isQuizModalOpen.value = true;
+}
+
+function closeQuizModal() {
+  isQuizModalOpen.value = false;
+  quizSkill.value = null;
+}
+
+async function handleSkillVerified(payload) {
+  await loadRoadmapData();
+  triggerToast(`🛡️ ${payload?.skill?.name || 'Skill'} verified! Proof of Skill badge unlocked.`);
+}
+
+function handleDrawerOpenQuiz(payload) {
+  const node = (data.value.nodes || []).find((n) => n.slug === payload.skill?.slug);
+  if (node) {
+    closeDrawer();
+    openQuizModal(node);
+  }
+}
 
 const viewMode = ref(localStorage.getItem('cg_roadmap_view') || 'canvas');
 
@@ -774,6 +819,10 @@ const NEXT_STATUS = {
 
 async function cycleStatus(node) {
   const next = NEXT_STATUS[node.status] || 'in_progress';
+  if (next === 'completed') {
+    openQuizModal(node);
+    return;
+  }
   await setStatus(node, next);
 }
 
@@ -812,25 +861,35 @@ function selectMenuStatus(targetStatus) {
       closeContextMenu();
       return;
     }
+    if (targetStatus === 'completed') {
+      const targetNode = contextMenu.node;
+      closeContextMenu();
+      openQuizModal(targetNode);
+      return;
+    }
     setStatus(contextMenu.node, targetStatus);
   }
 }
 
 
-function statusClass(status, isLocked) {
+function statusClass(status, isLocked, isVerified) {
   if (isLocked) return 'node-locked';
+  if (isVerified) return 'node-verified';
   return { completed: 'node-done', in_progress: 'node-progress', not_started: 'node-todo' }[status];
 }
-function statusLabel(status, isLocked) {
+function statusLabel(status, isLocked, isVerified) {
   if (isLocked) return 'Locked';
+  if (isVerified) return 'Verified';
   return { completed: 'Done', in_progress: 'Learning', not_started: 'Start' }[status];
 }
-function statusIcon(status, isLocked) {
+function statusIcon(status, isLocked, isVerified) {
   if (isLocked) return '🔒';
+  if (isVerified) return '🛡️';
   return { completed: '✓', in_progress: '⚡', not_started: '+' }[status];
 }
-function badgeClass(status, isLocked) {
+function badgeClass(status, isLocked, isVerified) {
   if (isLocked) return 'badge-quick-locked';
+  if (isVerified) return 'badge-quick-verified';
   return { completed: 'badge-quick-done', in_progress: 'badge-quick-progress', not_started: 'badge-quick-todo' }[status];
 }
 </script>
@@ -1531,10 +1590,30 @@ function badgeClass(status, isLocked) {
 .quick-status-btn:hover:not(:disabled) { transform: scale(1.05); }
 
 .badge-quick-done { background: var(--done); color: #ffffff; }
+.badge-quick-verified { background: #15803d; color: #ffffff; border: 1px solid #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25); font-weight: 700; }
 .badge-quick-progress { background: var(--progress); color: #1e293b; }
 .badge-quick-todo { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
 .badge-quick-locked { background: #f1f5f9; color: #94a3b8; border: 1px solid #cbd5e1; cursor: not-allowed; }
 
+.badge-verified {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #86efac !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.2) !important;
+}
+
+.canvas-card-verified-shield,
+.verified-shield-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  filter: drop-shadow(0 1px 2px rgba(21, 128, 61, 0.3));
+}
+
+.node-verified { background: #f0fdf4; border-color: #86efac; }
+.node-verified .skill-node-name { color: #15803d; }
 .node-done { background: var(--done-soft); border-color: #bbf0ce; }
 .node-done .skill-node-name { color: var(--done); }
 .node-progress { background: var(--progress-soft); border-color: #fde3a3; }

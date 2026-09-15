@@ -119,6 +119,9 @@ async function buildRoadmap(userId, careerId) {
       phaseDesc = 'Architecture, optimization & production tooling';
     }
 
+    const isVerified = !!((progressDoc && progressDoc.verified) || (userSkill && userSkill.verified));
+    const quizScore = (progressDoc && progressDoc.quizScore) || 0;
+
     return {
       skillId: skill._id,
       explicitSkillId: skill.skillId || skill.slug,
@@ -131,6 +134,8 @@ async function buildRoadmap(userId, careerId) {
       userLevelLabel: LEVEL_LABELS[declaredLevel] || 'None',
       status,
       percent,
+      verified: isVerified,
+      quizScore,
       courseId: course ? course._id : null,
       phaseId,
       phaseTitle,

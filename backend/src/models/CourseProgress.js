@@ -7,7 +7,10 @@ const courseProgressSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   percent: { type: Number, default: 0 },
   completedLessonCount: { type: Number, default: 0 },
-  totalLessonCount: { type: Number, default: 0 }
+  totalLessonCount: { type: Number, default: 0 },
+  verified: { type: Boolean, default: false },
+  quizScore: { type: Number, default: 0 },
+  verifiedAt: { type: Date }
 }, { timestamps: true });
 
 courseProgressSchema.index({ user: 1, course: 1 }, { unique: true });
