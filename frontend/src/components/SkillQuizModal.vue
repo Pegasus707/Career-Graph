@@ -297,9 +297,6 @@ async function submitQuiz() {
       answers: userAnswers.value
     });
     result.value = data;
-    if (data.passed) {
-      emit('verified', { skill: props.skill, result: data });
-    }
   } catch (err) {
     console.error('Failed to submit quiz:', err);
     error.value = err.response?.data?.message || 'Failed to submit quiz. Please try again.';
@@ -308,20 +305,31 @@ async function submitQuiz() {
   }
 }
 
+let hasEmittedVerified = false;
+
+function notifyVerified() {
+  if (result.value?.passed && !hasEmittedVerified) {
+    hasEmittedVerified = true;
+    emit('verified', { skill: props.skill, result: result.value });
+  }
+}
+
 function retryQuiz() {
   result.value = null;
   currentIndex.value = 0;
+  hasEmittedVerified = false;
   if (quiz.value) {
     userAnswers.value = new Array(quiz.value.questions.length).fill(null);
   }
 }
 
 function handleCompleteAndClose() {
-  emit('verified', { skill: props.skill, result: result.value });
+  notifyVerified();
   closeModal();
 }
 
 function closeModal() {
+  notifyVerified();
   emit('close');
 }
 
