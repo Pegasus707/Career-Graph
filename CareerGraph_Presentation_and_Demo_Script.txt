@@ -7,10 +7,10 @@
 TEAM DIVISION & ROLES:
 ----------------------------------------------------------------------------------------
 PPT Presenters (Slides 1 to 13):
-  1. Shinde Piyush Anil       -> Slides 1, 2, 3   (Intro, Problem, Solution)
-  2. Telore Jagruti Kishore   -> Slides 4, 5, 6   (Comparison, Architecture, Database)
+  1. Waychal Sanyukta Amol    -> Slides 1, 2, 3   (Introduction, Problem, Solution)
+  2. Shinde Piyush Anil       -> Slides 4, 5, 6   (Comparison, Architecture, Database)
   3. Tumma Varsha Chandraprakash -> Slides 7, 8, 9   (3 Phases & Rules, Quiz, Skill Sharing)
-  4. Waychal Sanyukta Amol    -> Slides 10, 11, 12, 13 (UI Features, Pros & Cons, Hosting, Conclusion)
+  4. Telore Jagruti Kishore   -> Slides 10, 11, 12, 13 (UI Features, Pros & Cons, Hosting, Conclusion)
 
 Live Demonstrators:
   5. Vichare Sanika Sanjay    -> Demo Part 1 (Login/Signup, Onboarding, Initial Roadmap, Profile)
@@ -23,7 +23,7 @@ PART 1: PPT SLIDES PRESENTATION SCRIPT
 ========================================================================================
 
 ----------------------------------------------------------------------------------------
-SPEAKER 1: SHINDE PIYUSH ANIL
+SPEAKER 1: WAYCHAL SANYUKTA AMOL
 Slides Covered: Slide 1, Slide 2, Slide 3
 ----------------------------------------------------------------------------------------
 
@@ -76,16 +76,16 @@ Second, our 4 core features:
 3. Universal skill credit: Skills you master in one track automatically count in other tracks.
 4. Proof-of-Skill quizzes: Short tests that give you a verified badge.
 
-Now, Jagruti will explain our comparison with existing platforms and our system architecture."
+Now, Piyush will explain our comparison with existing platforms and our system architecture."
 
 
 ----------------------------------------------------------------------------------------
-SPEAKER 2: TELORE JAGRUTI KISHORE
+SPEAKER 2: SHINDE PIYUSH ANIL
 Slides Covered: Slide 4, Slide 5, Slide 6
 ----------------------------------------------------------------------------------------
 
 [SLIDE 4: LITERATURE SURVEY & COMPARATIVE ANALYSIS]
-"Thank you, Piyush.
+"Thank you, Sanyukta.
 
 If we compare Career Graph with existing platforms:
 - Websites like roadmap.sh only show static pictures. Career Graph gives an interactive canvas 
@@ -125,7 +125,7 @@ Slides Covered: Slide 7, Slide 8, Slide 9
 ----------------------------------------------------------------------------------------
 
 [SLIDE 7: CORE LOGIC 1 - Topological Prerequisite Engine]
-"Thank you, Jagruti.
+"Thank you, Piyush.
 
 Our roadmap follows a strict 3-phase rule so students don't skip the basics:
 
@@ -158,11 +158,11 @@ In Career Graph, the system recognizes that they already verified Git and Python
 complete instantly in the new track!
 
 This saves students dozens of hours.
-Now Sanyukta will cover our UI, advantages, and deployment."
+Now Jagruti will cover our UI, advantages, and deployment."
 
 
 ----------------------------------------------------------------------------------------
-SPEAKER 4: WAYCHAL SANYUKTA AMOL
+SPEAKER 4: TELORE JAGRUTI KISHORE
 Slides Covered: Slide 10, Slide 11, Slide 12, Slide 13
 ----------------------------------------------------------------------------------------
 
@@ -224,7 +224,7 @@ Live Demo Part 1: Login, Onboarding, Initial Roadmap & Profile
 [STEP 1: LOGIN / SIGNUP]
 Action: Open browser to live web app.
 Sanika speaks:
-"Thank you, Sanyukta.
+"Thank you, Jagruti.
 Respected teachers, I will now show the user onboarding.
 
 [Action: Type test email and password, click Register / Sign In]
@@ -336,7 +336,7 @@ PART 3: COMMON EXAMINER QUESTIONS & SIMPLE ANSWERS
 ========================================================================================
 
 Q1: Why not just use roadmap.sh?
-Answer (Piyush / Jagruti):
+Answer (Sanyukta / Piyush):
 "roadmap.sh is just a static picture. It doesn't track progress, doesn't lock prerequisites, 
 and doesn't test student skills."
 
@@ -356,7 +356,7 @@ Answer (Varsha / Archit):
 have that skill ID verified."
 
 Q5: Why did you choose Vue 3 and Node.js?
-Answer (Sanyukta / Sanika):
+Answer (Jagruti / Sanika):
 "Vue 3 makes the interactive canvas fast and smooth, and Node.js with Express gives fast REST API 
 responses under 100 milliseconds."
 ========================================================================================
