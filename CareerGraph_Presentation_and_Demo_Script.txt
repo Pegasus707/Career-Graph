@@ -1,0 +1,501 @@
+========================================================================================
+                     CAREER GRAPH - PRESENTATION & LIVE DEMO SCRIPT
+            Academic Capstone Project | Group No. 06 | AY 2025 - 2026
+           Department of Computer Engineering / Information Technology
+========================================================================================
+
+TEAM DIVISION & ROLES:
+----------------------------------------------------------------------------------------
+PPT Slide Presenters (Slides 1 to 13):
+  1. Shinde Piyush Anil       -> Slides 1, 2, 3   (Introduction, Problem, Proposed Solution)
+  2. Telore Jagruti Kishore   -> Slides 4, 5, 6   (Literature Survey, Architecture, Database)
+  3. Tumma Varsha Chandraprakash -> Slides 7, 8, 9   (Prerequisite Engine, Quiz, Cross-Track)
+  4. Waychal Sanyukta Amol    -> Slides 10, 11, 12, 13 (UI Features, Advantages/Disadv, Deployment, Conclusion)
+
+Live System Demonstrators:
+  5. Vichare Sanika Sanjay    -> Demo Part 1 (Auth, Onboarding, Initial Roadmap, Profile Dashboard)
+  6. Surve Archit Milind      -> Demo Part 2 (SVG Canvas, 1-Click Toggle, Prerequisite Lock,
+                                              Topic Drawer, Proof-of-Skill Quiz, Cross-Track Propagation)
+========================================================================================
+
+
+========================================================================================
+PART 1: PPT SLIDE PRESENTATION SCRIPT
+========================================================================================
+
+----------------------------------------------------------------------------------------
+SPEAKER 1: SHINDE PIYUSH ANIL
+Slides Covered: Slide 1, Slide 2, Slide 3
+----------------------------------------------------------------------------------------
+
+[SLIDE 1: TITLE SLIDE - Career Graph]
+"Respected external examiners, faculty members, and fellow students, a very good morning.
+
+We are Group Number 06, representing the Department of Computer Engineering and Information 
+Technology. Today, we are proud to present our capstone project: Career Graph — an Interactive 
+and Personalized IT Career Roadmap Platform with Topological Prerequisite Locking and 
+Proof-of-Skill Verification.
+
+Our platform is engineered as a decoupled modern cloud application using Vue 3 on the frontend, 
+Node.js and Express for our backend REST API, and MongoDB Atlas for our persistence layer.
+
+Before our teammates Sanika and Archit demonstrate the live application, we will walk you 
+through the problem statement, system architecture, core algorithmic logic, and technical design."
+
+
+[SLIDE 2: PROBLEM STATEMENT - Challenges in Modern IT Learning]
+"Every year, thousands of IT and Computer Engineering undergraduates face significant confusion 
+when preparing for industry careers. Through our research, we identified four fundamental challenges:
+
+1. Premature High-Level Tool Fatigue:
+   Beginners routinely jump straight into complex frameworks like React, Docker, or Kubernetes 
+   before mastering essential foundations like the JavaScript event loop, Linux CLI, or HTTP protocols. 
+   This causes cognitive overload and leads to course dropout rates exceeding 70%.
+
+2. Static and Non-Adaptive Visualizers:
+   Existing platforms like roadmap.sh provide static, read-only SVG diagrams. They cannot evaluate 
+   student competencies, adapt to university degree streams, or provide personalized progression.
+
+3. Siloed, Non-Portable Skill Progress:
+   When a student completes core subjects like Git, Python, or SQL in a Web Development course, 
+   that progress is trapped in an isolated silo. If they pivot to DevOps or AI/ML, they are forced 
+   to repeat the same modules from scratch.
+
+4. Unverified 'Honor-System' Checklists:
+   Mainstream platforms rely on self-marked checkboxes or passive video view times with zero objective 
+   validation, creating a false sense of competency.
+
+Career Graph was engineered specifically to solve these four critical bottlenecks."
+
+
+[SLIDE 3: PROPOSED SOLUTION - The Career Graph Platform]
+"To address this, Career Graph implements a structured 5-Tier Curriculum Hierarchy supported by 
+4 Core Technical Pillars.
+
+On the pedagogical side, our hierarchy decomposes education into:
+- Tier 1: 6 Industry-aligned Career Tracks,
+- Tier 2: Discrete atomic skills structured into dependency graphs,
+- Tier 3: Dedicated 1-to-1 course curricula,
+- Tier 4: Strict Beginner, Intermediate, and Advanced levels, and
+- Tier 5: Granular lessons with actionable theory and runnable code.
+
+Technically, this is powered by our 4 core pillars:
+1. A Topological Prerequisite Engine that mathematically locks advanced phases until fundamentals 
+   are complete.
+2. An Adaptive Onboarding Baseline that calibrates the roadmap to each student's degree and stream.
+3. Our Universal Cross-Track Credit System, ensuring skills mastered in one track automatically 
+   count in all other tracks.
+4. A Server-Graded Proof-of-Skill Engine that evaluates advanced students through tamper-proof 
+   micro-quizzes.
+
+I now hand over to Jagruti to present our comparative survey, architecture, and database design."
+
+
+----------------------------------------------------------------------------------------
+SPEAKER 2: TELORE JAGRUTI KISHORE
+Slides Covered: Slide 4, Slide 5, Slide 6
+----------------------------------------------------------------------------------------
+
+[SLIDE 4: LITERATURE SURVEY & COMPARATIVE ANALYSIS]
+"Thank you, Piyush.
+
+To validate our approach, we benchmarked Career Graph against leading alternatives like 
+roadmap.sh and traditional MOOC platforms like Coursera and Udemy:
+
+- While roadmap.sh offers community-driven static SVG diagrams, Career Graph provides a dynamic 
+  SVG Bézier canvas with interactive pan, drag, and zoom.
+- Unlike MOOCs that restrict prerequisites to linear playlists, our system implements strict 
+  multi-phase topological Directed Acyclic Graph (DAG) gating.
+- Crucially, neither roadmap.sh nor MOOCs support cross-track skill transfer. In Career Graph, 
+  canonical skill identifiers allow instant credit propagation across tracks.
+- Finally, we replace unverified checkboxes and video watch counters with server-graded, 
+  anti-cheating micro-quizzes that award tamper-proof verified badges."
+
+
+[SLIDE 5: THREE-TIER DECOUPLED SYSTEM ARCHITECTURE]
+[Action: Point to Figure 1 on the slide]
+"Slide 5 illustrates our complete cloud system architecture:
+
+- At the Presentation Tier, we have a Vue 3 Single Page Application built using the Composition 
+  API and Vite 5.3. Reactive state is managed using Pinia stores, and connector curves between 
+  nodes are computed mathematically on an HTML5 SVG canvas.
+- At the Application Tier, we run a Node.js 18+ runtime with an Express 4.19 REST API. This tier 
+  handles stateless JWT authentication, Bcrypt password hashing, and houses our core skillGapService 
+  algorithmic engine.
+- At the Persistence Tier, we utilize MongoDB Atlas. We enforce 9 normalized Mongoose 8.5 schemas 
+  with compound uniqueness indexes to ensure all progress writes are idempotent.
+- In terms of hosting, the frontend is deployed globally on Vercel's Edge CDN with SPA rewrite rules, 
+  while the backend is continuously deployed on Render Web Services with git-triggered pipelines."
+
+
+[SLIDE 6: DATABASE SCHEMA & ENTITY-RELATIONSHIP MODELING]
+[Action: Point to Figure 2 on the slide]
+"Our database model is structured to maintain referential integrity while supporting high-throughput 
+read operations:
+
+- The User and UserProfile collections maintain a strict 1-to-1 association storing authentication 
+  hashes, academic stream, degree, and baseline self-ratings.
+- The Career collection links to Skill documents, which explicitly store prerequisite and related 
+  skill Object IDs.
+- Each skill maps 1-to-1 to a Course, which cascades into Level and atomic lesson entities.
+- To log student activity safely, CourseProgress and LessonProgress enforce compound unique indexes 
+  on user and course or lesson IDs. This guarantees that duplicate network requests or retries will 
+  never corrupt user records.
+- Finally, SkillQuiz documents store question payloads and server-side answer keys for our validation engine.
+
+I now invite Varsha to explain the algorithmic logic behind prerequisite gating and skill propagation."
+
+
+----------------------------------------------------------------------------------------
+SPEAKER 3: TUMMA VARSHA CHANDRAPRAKASH
+Slides Covered: Slide 7, Slide 8, Slide 9
+----------------------------------------------------------------------------------------
+
+[SLIDE 7: CORE LOGIC 1 - Topological Prerequisite Engine]
+"Thank you, Jagruti.
+
+The cornerstone of Career Graph's learning methodology is our Topological Prerequisite Engine.
+Our roadmap is organized into three strictly governed phases:
+
+- Phase 1: Foundations is unconditionally unlocked upon registration. For example, in the Full Stack 
+  track, this covers HTML, CSS, JavaScript, and Git. This ensures that every student solidifies basic 
+  syntax and engineering tooling first.
+- Phase 2: Core Stack is strictly locked until all Phase 1 skills reach 100% completion. A student 
+  cannot access Node.js, Express, or MongoDB until their foundational JavaScript and Git are mastered.
+- Phase 3: Advanced & Cloud is locked until Phase 2 is complete, preventing learners from attempting 
+  Docker, Kubernetes, or AWS without backend proficiency.
+
+At the micro-level, our algorithm performs topological sort traversals across node dependencies. 
+If a student attempts to access a node whose prerequisite Object IDs are incomplete, the engine 
+prevents access and dynamically highlights the next recommended skill."
+
+
+[SLIDE 8: CORE LOGIC 2 - Proof-of-Skill Validation System]
+"Slide 8 highlights our Proof-of-Skill Validation System, which enforces objective competency:
+
+1. Advanced Phase Gating:
+   Validation quizzes cannot be accessed on day one. A student must reach the Advanced level by 
+   finishing lessons or having an evaluated baseline.
+
+2. Anti-Cheating Sanitization:
+   When a student opens a quiz, the API explicitly strips out correctIndex and explanation fields 
+   before returning the JSON payload. Even if a student inspects DevTools or Network tabs, the 
+   answer keys do not exist in the browser.
+
+3. Server-Side Grading:
+   The student's submitted option indexes are evaluated exclusively on the backend. Achieving at 
+   least 2 out of 3 correct answers (66.7%) awards the Verified Badge (Shield icon), elevates their 
+   skill rating to Level 4 (Expert), and atomically marks the course syllabus complete in a single transaction."
+
+
+[SLIDE 9: UNIVERSAL CROSS-TRACK SKILL PROPAGATION]
+"One of our proudest innovations is Universal Cross-Track Skill Propagation.
+
+Consider a real-world scenario:
+- A student enrolls in the Full Stack Developer track. They master Git (100%) and Python (100%) and 
+  pass the validation quizzes.
+- Later in the semester, they decide to explore DevOps or AI/ML.
+- In conventional platforms, they would have to re-watch videos and re-complete Git and Python modules.
+- In Career Graph, skills are tracked under canonical keys like 'skill-git' and 'skill-python'. When the 
+  student switches tracks, the engine immediately checks their universal skill inventory. Git and 
+  Python are automatically displayed as 100% Complete and Verified.
+
+This treats learning achievements as portable developer assets rather than course-locked silos.
+
+I now invite Sanyukta to cover our UI engine, advantages, limitations, and future scope."
+
+
+----------------------------------------------------------------------------------------
+SPEAKER 4: WAYCHAL SANYUKTA AMOL
+Slides Covered: Slide 10, Slide 11, Slide 12, Slide 13
+----------------------------------------------------------------------------------------
+
+[SLIDE 10: INTERACTIVE UI FEATURES & CANVAS ENGINE]
+"Thank you, Varsha.
+
+User experience is critical for student engagement. Career Graph introduces four standout frontend features:
+
+1. Dynamic SVG Bézier Canvas Engine:
+   Organizes skills into 3 responsive phase columns with real-time cubic Bézier curves and directional 
+   dependency arrows. Features smooth viewport pan, drag, and a 50% to 150% zoom HUD with auto-reset.
+
+2. 1-Click Interactive Status Toggling:
+   Learners click directly on status badges to cycle from 'Not Started' -> 'In Progress' -> 'Completed' 
+   in 1 second. A right-click context menu enables direct jumps to any status, updating atomic database rollups.
+
+3. Slide-Out Topic Preview Drawer:
+   A non-disruptive drawer slides out directly within the roadmap view without losing canvas state. 
+   Provides 'Why It Matters' summaries, official documentation links, video tutorials, and interactive checklists.
+
+4. Instant Career Switcher Modal:
+   Allows instant switching across 6 target career tracks with real-time stream and degree filtering, 
+   updating the visual canvas in place while preserving all mastered competencies."
+
+
+[SLIDE 11: SYSTEM ADVANTAGES & TECHNICAL LIMITATIONS]
+"As engineers, we conducted a rigorous and balanced evaluation of Career Graph.
+
+Our Key Advantages include:
+1. Enforced Prerequisite Sequencing: Topological gating prevents premature framework adoption, 
+   drastically reducing student dropout rates.
+2. Universal Cross-Track Mobility: Mastered skills (Git, Python, SQL) carry over immediately when 
+   switching tracks, saving dozens of hours of duplicate study.
+3. Tamper-Proof Proof-of-Skill: Server-graded micro-quizzes with client payload sanitization eliminate 
+   honor-system cheating and award credible badges.
+4. Non-Disruptive Dynamic Navigation: In-canvas preview drawers and 1-click status toggling maintain 
+   learner focus without constant page refreshes.
+5. Production-Ready Decoupled Stack: Modern Vue 3 SPA + Node/Express REST API delivers sub-100ms 
+   UI response times and horizontal cloud scalability.
+
+Equally, we acknowledge our current Technical Limitations:
+1. Initial Curriculum Scope: Currently covers 6 high-demand IT tracks; emerging niche fields require 
+   ongoing administrator curation.
+2. Fixed Validation Quiz Pool: Each skill currently draws from a curated 3-question evaluation pool; 
+   future expansion requires randomized question banks.
+3. Active Network Dependency: Real-time progress synchronization and server-side quiz grading require 
+   active internet connectivity (no local offline PWA caching).
+4. Absence of In-Browser Code Sandbox: Assesses conceptual and architectural understanding through 
+   quizzes, but does not yet compile live code in a WebAssembly sandbox.
+5. Subjective Initial Onboarding: Initial baseline self-ratings rely on student honesty upon sign-up 
+   until objectively validated through subsequent micro-quizzes."
+
+
+[SLIDE 12: PRODUCTION DEPLOYMENT & OPERATIONAL ARCHITECTURE]
+"Career Graph is fully deployed and operational in production:
+
+- Frontend (Vercel Edge): Vue 3 + Vite 5.3 build hosted on Vercel Global Edge CDN with automated caching 
+  and vercel.json rewrite rules routing all subpaths to index.html to prevent 404 errors.
+- Backend (Render Web Service): Node.js 18+ and Express 4.19 deployed on Render with automated CI/CD 
+  pipelines triggered on git push to main, secured via strict CORS whitelisting and stateless JWTs.
+- Database (MongoDB Atlas): Managed cloud replica set with TLS/SSL encryption, daily automated backups, 
+  and connection pooling."
+
+
+[SLIDE 13: CONCLUSION, FUTURE SCOPE & HANDOVER]
+"To conclude, Career Graph delivers an interactive, personalized, and mathematically structured platform 
+that transforms how computer engineering students prepare for the IT industry.
+
+In the future, we plan to integrate LLM-based adaptive diagnostic tutoring, embed in-browser WebAssembly 
+code execution sandboxes, and launch an enterprise talent portal for recruiters.
+
+We will now transition to our live system demonstration.
+
+First, Sanika Vichare will demonstrate user registration, personalized onboarding, and profile analytics. 
+Following that, Archit Surve will showcase the live roadmap canvas, prerequisite gating, proof-of-skill quiz, 
+and universal cross-track skill propagation.
+
+Over to you, Sanika!"
+
+
+========================================================================================
+PART 2: LIVE DEMONSTRATION SCRIPT
+========================================================================================
+
+----------------------------------------------------------------------------------------
+DEMONSTRATOR 1: VICHARE SANIKA SANJAY
+Live Demo Part 1: Authentication, Onboarding, Initial Roadmap & Profile
+----------------------------------------------------------------------------------------
+
+[STEP 1: USER REGISTRATION & SECURE AUTHENTICATION]
+Action: Open browser to Career Graph web app. Navigate to Login / Signup view.
+Sanika speaks:
+"Thank you, Sanyukta.
+Respected examiners, I will now walk you through the user onboarding and account experience.
+
+[Action: Enter email and password, click Register / Sign In]
+
+When a student signs up, our backend hashes their password with 10 salt rounds of Bcrypt and 
+returns a secure, stateless JSON Web Token (JWT). The token is stored client-side and automatically 
+attached as a Bearer authorization header for all subsequent API requests."
+
+
+[STEP 2: ADAPTIVE ONBOARDING FLOW]
+Action: Show the Onboarding survey modal.
+Sanika speaks:
+"Upon initial login, Career Graph doesn't just show a generic roadmap. It presents an Adaptive Onboarding Flow.
+
+[Action: Select Stream: Information Technology / Computer Engineering -> Degree: B.Tech / B.E.]
+
+Here, the student selects their academic degree and stream. Next, they select their target industry role — 
+for example, Full Stack Developer.
+
+[Action: Select Target Career: Full Stack Developer -> Complete Onboarding]
+
+The system saves these preferences in the UserProfile collection and calibrates the roadmap specifically 
+to this student's profile."
+
+
+[STEP 3: FIRST LOOK AT THE ROADMAP CANVAS & INITIAL STATES]
+Action: Roadmap view loads. Briefly show the 3 phase columns.
+Sanika speaks:
+"The student is immediately greeted by their personalized visual roadmap. Notice how the curriculum 
+is organized into three clean columns:
+- Phase 1: Foundations is unlocked and ready for learning.
+- While Phase 2 and Phase 3 are visually locked, indicating that prerequisite skills must be cleared first.
+
+Before Archit interacts with this graph, let me quickly show the User Profile."
+
+
+[STEP 4: USER PROFILE & SKILL ANALYTICS DASHBOARD]
+Action: Click on top navigation bar to go to Profile (/profile).
+Sanika speaks:
+"Navigating to the Profile View, we see a complete breakdown of the student's learning profile.
+
+[Action: Point to Profile Stats cards]
+
+It displays their current target career track, academic stream, overall completion percentage, and an 
+inventory of verified skill badges. As students complete lessons and pass validation quizzes, these 
+statistics update atomically.
+
+I will now hand over to Archit Surve, who will demonstrate the interactive canvas, prerequisite enforcement, 
+the proof-of-skill quiz, and cross-track credit propagation."
+
+
+----------------------------------------------------------------------------------------
+DEMONSTRATOR 2: SURVE ARCHIT MILIND
+Live Demo Part 2: Interactive Canvas, Prerequisite Locking, Quiz & Cross-Track Propagation
+----------------------------------------------------------------------------------------
+
+[STEP 1: INTERACTIVE SVG BÉZIER CANVAS ENGINE & VIEWPORT CONTROLS]
+Action: Navigate back to Roadmap view (/roadmap). Click and drag to pan, use zoom buttons.
+Archit speaks:
+"Thank you, Sanika.
+Respected examiners, let us now examine the core interactive capabilities of the Career Graph canvas.
+
+[Action: Pan around the canvas, zoom in to 125%, zoom out to 75%, click Reset Zoom]
+
+Unlike static image-based roadmaps, our canvas is dynamically computed in SVG. As you can see, I can 
+smoothly pan and drag the entire viewport, zoom in from 50% to 150%, and reset it anytime.
+The connectors you see between skills are cubic Bézier curves calculated in real time, featuring 
+directional dependency arrows to show clear prerequisite flow."
+
+
+[STEP 2: 1-CLICK STATUS TOGGLING & PREREQUISITE LOCKING DEMO]
+Action: Click directly on a Phase 1 node's status badge (e.g. Git or HTML). Toggle states. Then attempt to access Phase 2.
+Archit speaks:
+"Now, let's look at user interaction.
+
+[Action: Click status badge on 'Git' to cycle from 'Not Started' -> 'In Progress' -> 'Completed']
+
+With our 1-click toggle engine, a student can update their progress in one second directly on the node, 
+triggering an optimistic UI update backed by an atomic database rollup.
+
+[Action: Attempt to access or toggle a Phase 2 node like 'Node.js']
+
+Now, observe what happens when I attempt to jump ahead into Phase 2. The system enforces our Topological 
+Prerequisite Engine: Node.js and Express remain strictly gated because their foundational Phase 1 
+prerequisites (JavaScript and HTML/CSS) have not all reached 100% completion. This prevents students 
+from rushing into backend APIs without language fundamentals."
+
+
+[STEP 3: IN-CANVAS SLIDE-OUT TOPIC PREVIEW DRAWER]
+Action: Click on a skill node (e.g. 'Git' or 'HTML') to open the slide-out drawer from the right.
+Archit speaks:
+"When a student wants to study a skill, they don't have to navigate away to a separate page.
+
+[Action: Click on Git node; drawer slides out smoothly]
+
+Clicking on any node triggers our Slide-Out Topic Preview Drawer. Here, the student gets:
+- A concise 'Why It Matters' engineering explanation,
+- Curated official documentation links and video tutorials, and
+- An interactive syllabus checklist of lessons with Beginner, Intermediate, and Advanced tiers.
+
+The student can study, mark lessons complete, and close the drawer without ever losing their visual 
+position on the roadmap."
+
+
+[STEP 4: PROOF-OF-SKILL MICRO-QUIZ & VERIFIABLE BADGE]
+Action: Open the Quiz Modal for an eligible skill (or click 'Verify Skill' button). Answer questions and submit.
+Archit speaks:
+"Now let us demonstrate our Proof-of-Skill Validation System.
+
+[Action: Open Skill Quiz Modal]
+
+When I open this quiz, let me highlight our security: if we inspect the browser's Network tab, the 
+backend API has stripped all answer keys and explanations. Cheating via DevTools is impossible.
+
+[Action: Answer 3 technical multiple-choice questions, getting at least 2 correct, click Submit]
+
+I will now submit my answers. The evaluation happens strictly on our Node.js server.
+
+[Action: Submission succeeds! Verified Badge alert appears]
+
+Because we scored at least 66.7%, the server awards the Verified Skill Badge (Shield icon), elevates 
+our profile to Expert Level 4, and automatically marks all underlying lessons complete."
+
+
+[STEP 5: UNIVERSAL CROSS-TRACK SKILL PROPAGATION]
+Action: Click the 'Switch Career Track' button at the top. Select 'DevOps Engineer'.
+Archit speaks:
+"Finally, let us demonstrate our core architectural differentiator: Universal Cross-Track Credit.
+
+Notice that we have just mastered and verified Git and Python in the Full Stack Developer track.
+Now, imagine this student wants to switch their career aspiration to DevOps Engineer.
+
+[Action: Click 'Switch Track', choose 'DevOps Engineer', click Confirm]
+
+The modal switches the target career in place. The roadmap re-renders instantly for DevOps.
+
+[Action: Point to Git and Python on the newly loaded DevOps canvas]
+
+Look at the Git node in the DevOps roadmap: it is ALREADY 100% Complete and holds the Verified Badge!
+The student does not have to re-do Git simply because they switched paths. The platform immediately 
+acknowledged their prior verified competency."
+
+
+[STEP 6: DEMONSTRATION CONCLUSION & HANDOVER FOR Q&A]
+Archit speaks:
+"This concludes our live system demonstration. We have proven that Career Graph delivers structured 
+prerequisite learning, anti-cheating verification, and unified cross-track mobility.
+
+Our entire team — Piyush, Jagruti, Varsha, Sanika, Sanyukta, and myself — is now ready to take 
+questions from the examiners. Thank you!"
+
+
+========================================================================================
+PART 3: EXAMINER VIVA & Q&A CHEAT SHEET
+========================================================================================
+
+Question 1: Why not simply use roadmap.sh?
+Answering Members: Shinde Piyush Anil / Telore Jagruti Kishore
+Key Points:
+- roadmap.sh is static and read-only.
+- It doesn't assess student knowledge or degree stream.
+- It lacks prerequisite locking and allows users to blindly jump anywhere.
+- It doesn't verify skills or support cross-track progress transfer.
+
+Question 2: How does the Topological Prerequisite Gating work algorithmically?
+Answering Members: Tumma Varsha Chandraprakash / Surve Archit Milind
+Key Points:
+- Implemented in backend skillGapService.js.
+- Graph nodes are organized into Directed Acyclic Graphs (DAGs).
+- Macro-phases (Foundations -> Core -> Advanced) require 100% of preceding phase skills.
+- Micro-nodes verify prerequisite Object IDs prior to unlocking.
+
+Question 3: How do you prevent cheating on the Proof-of-Skill quizzes?
+Answering Members: Tumma Varsha Chandraprakash / Surve Archit Milind
+Key Points:
+- Client GET request projection explicitly removes correctIndex and explanation.
+- Answer keys are never transmitted to the browser DOM, local storage, or network response.
+- Grading logic executes strictly on the backend API inside quizController.js.
+
+Question 4: How is cross-track progress shared across different careers?
+Answering Members: Tumma Varsha Chandraprakash / Surve Archit Milind
+Key Points:
+- Skills are identified by canonical string IDs ('skill-git', 'skill-python').
+- Progress is stored at the user-skill level, not isolated inside career documents.
+- When switching tracks, the engine matches canonical skillIds to immediately reflect credit.
+
+Question 5: How do you guarantee data integrity under high traffic or retries?
+Answering Members: Telore Jagruti Kishore
+Key Points:
+- MongoDB compound unique indexes on CourseProgress ({ user: 1, course: 1 }) and 
+  LessonProgress ({ user: 1, lesson: 1 }).
+- Ensures all write operations are idempotent; network retries cannot create duplicate records.
+
+Question 6: Why did you choose Vue 3 and Node.js/Express over alternatives?
+Answering Members: Waychal Sanyukta Amol / Vichare Sanika Sanjay
+Key Points:
+- Vue 3 Composition API provides fine-grained reactivity for smooth SVG canvas rendering.
+- Node.js and Express offer non-blocking I/O, sub-100ms response times, and lightweight REST endpoints.
+========================================================================================
