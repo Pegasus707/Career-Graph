@@ -43,7 +43,6 @@ function fillClass(status) {
 .chart-value { font-size: 0.78rem; text-align: right; color: var(--text-dim); }
 
 .chart-axis-row { display: grid; grid-template-columns: 110px 1fr 40px; margin-top: 0.15rem; }
-.chart-axis-spacer { }
 .chart-axis {
   display: flex;
   justify-content: space-between;
