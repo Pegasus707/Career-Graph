@@ -447,6 +447,11 @@ function closeQuizModal() {
 }
 
 async function handleSkillVerified(payload) {
+  if (payload?.skill) {
+    if (payload.skill._id) userStore.addVerifiedSkill(payload.skill._id);
+    if (payload.skill.slug) userStore.addVerifiedSkill(payload.skill.slug);
+    if (payload.skill.skillId) userStore.addVerifiedSkill(payload.skill.skillId);
+  }
   await loadRoadmapData();
   triggerToast(`🛡️ ${payload?.skill?.name || 'Skill'} verified! Proof of Skill badge unlocked.`);
 }
@@ -715,11 +720,13 @@ function triggerToast(msg) {
   }, 4000);
 }
 
-// Shared Skill Reflection: Checks if skill was completed across any track in userStore
+// Shared Skill Reflection: Checks if skill was completed or verified across any track in userStore
 function isNodeCompleted(node) {
   if (!node) return false;
-  if (node.status === 'completed') return true;
+  if (node.verified || node.status === 'completed') return true;
   return (
+    userStore.isSkillVerified(node.skillId) ||
+    userStore.isSkillVerified(node.slug) ||
     userStore.isSkillCompleted(node.skillId) ||
     userStore.isSkillCompleted(node.slug) ||
     userStore.isSkillCompleted(node.explicitSkillId)
@@ -727,35 +734,47 @@ function isNodeCompleted(node) {
 }
 
 function resolveNodeStatus(node) {
+  if (node?.verified || userStore.isSkillVerified(node?.skillId) || userStore.isSkillVerified(node?.slug)) return 'completed';
   if (isNodeCompleted(node)) return 'completed';
   return node.status;
 }
 
-// Sequential Phase Locking: Verifies all prior phases are 100% finished
+// Strict Phase & Node Locking (Option B):
+// 1. Phase 1 is always unlocked.
+// 2. A phase is unlocked if the backend calculated phase.isLocked === false,
+//    or if at least one skill in that phase has had all prerequisites verified.
 function isPhaseLocked(index) {
   if (index === 0) return false;
-  const phases = data.value.phases || [];
-  for (let i = 0; i < index; i++) {
-    const p = phases[i];
-    if (!p || !p.nodes) continue;
-    const allDone = p.nodes.every((n) => isNodeCompleted(n));
-    if (!allDone) return true;
+  const phase = data.value.phases?.[index];
+  if (!phase) return false;
+  if (typeof phase.isLocked === 'boolean') {
+    return phase.isLocked;
+  }
+  if (phase.nodes && phase.nodes.length > 0) {
+    return phase.nodes.every((n) => n.isLocked && !n.verified);
   }
   return false;
 }
 
 function isNodeLocked(node, phaseIndex) {
-  if (isNodeCompleted(node)) return false;
+  if (!node) return false;
+  // If the skill has earned the Verified Badge, it is never locked
+  if (node.verified || userStore.isSkillVerified(node.skillId) || userStore.isSkillVerified(node.slug)) return false;
+  // If the entire phase is locked, this node is locked
   if (isPhaseLocked(phaseIndex)) return true;
+  // Otherwise, respect individual prerequisite locks
   return !!node.isLocked;
 }
 
 function resolveLockedReason(node, phaseIndex) {
-  if (isPhaseLocked(phaseIndex)) {
-    const prevTitle = data.value.phases[phaseIndex - 1]?.title || `Phase ${phaseIndex}`;
-    return `Locked: Complete all skills in ${prevTitle} first`;
+  if (node?.lockedReason) {
+    return node.lockedReason;
   }
-  return node.lockedReason || 'Complete prerequisites first';
+  if (isPhaseLocked(phaseIndex)) {
+    const prevTitle = data.value.phases?.[phaseIndex - 1]?.title || `Phase ${phaseIndex}`;
+    return `Locked: Earn Verified Badges in ${prevTitle} to unlock this phase`;
+  }
+  return 'Earn required Verified Badges in prerequisite skills first';
 }
 
 function handleNodeClick(node, phaseIndex) {

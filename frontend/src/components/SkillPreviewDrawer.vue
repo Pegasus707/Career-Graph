@@ -46,6 +46,23 @@
               <p>{{ skill.description }}</p>
             </section>
 
+            <!-- Prerequisites Status -->
+            <section class="drawer-section" v-if="skill.prerequisites?.length">
+              <h3>Prerequisites Status</h3>
+              <div class="prereq-badges-list">
+                <div
+                  v-for="p in skill.prerequisites"
+                  :key="p._id || p.slug"
+                  class="prereq-pill"
+                  :class="isPrereqVerified(p) ? 'prereq-pill-verified' : 'prereq-pill-pending'"
+                >
+                  <span class="prereq-icon">{{ isPrereqVerified(p) ? '🛡️' : '⏳' }}</span>
+                  <span class="prereq-name">{{ p.name }}</span>
+                  <span class="prereq-status-badge">{{ isPrereqVerified(p) ? 'Verified' : 'Badge Required' }}</span>
+                </div>
+              </div>
+            </section>
+
             <!-- Interactive Curriculum -->
             <section class="drawer-section" v-if="course">
               <div class="section-title-row">
@@ -228,6 +245,15 @@ const isGloballyCompleted = computed(() => {
 const isCompleted = computed(
   () => isVerified.value || meetsRequirement.value || courseProgress.value === 100 || isGloballyCompleted.value
 );
+
+function isPrereqVerified(prereq) {
+  if (!prereq) return false;
+  return (
+    userStore.isSkillVerified(prereq._id) ||
+    userStore.isSkillVerified(prereq.slug) ||
+    userStore.isSkillVerified(prereq.skillId)
+  );
+}
 
 async function loadSkillData() {
   if (!props.slug) return;
@@ -422,6 +448,40 @@ onUnmounted(() => {
 .drawer-section h3 {
   font-size: 1.05rem;
   margin-bottom: 0.5rem;
+}
+
+.prereq-badges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.prereq-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.prereq-pill-verified {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+.prereq-pill-pending {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+.prereq-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
 }
 
 .section-title-row {

@@ -12,6 +12,8 @@ export const useUserStore = defineStore('user', {
     declaredSkills: [],
     // Global set of completed skill identifiers (IDs, slugs) across all tracks
     globalCompletedSkills: [],
+    // Global set of verified skill identifiers (IDs, slugs) with Proof of Skill badges
+    globalVerifiedSkills: [],
     streamPreference: localStorage.getItem('cg_stream_preference') || '',
     degreePreference: localStorage.getItem('cg_degree_preference') || '',
     loading: false,
@@ -24,9 +26,15 @@ export const useUserStore = defineStore('user', {
       const target = skillIdOrSlug.toString();
       return state.globalCompletedSkills.includes(target);
     },
+    isSkillVerified: (state) => (skillIdOrSlug) => {
+      if (!skillIdOrSlug) return false;
+      const target = skillIdOrSlug.toString();
+      return state.globalVerifiedSkills.includes(target);
+    },
     userStream: (state) => state.streamPreference || state.profile?.education?.field || '',
     userDegree: (state) => state.degreePreference || state.profile?.education?.degree || '',
-    completedCount: (state) => state.globalCompletedSkills.length
+    completedCount: (state) => state.globalCompletedSkills.length,
+    verifiedCount: (state) => state.globalVerifiedSkills.length
   },
 
   actions: {
@@ -62,6 +70,21 @@ export const useUserStore = defineStore('user', {
       this.globalCompletedSkills = this.globalCompletedSkills.filter((s) => s !== str);
     },
 
+    addVerifiedSkill(skillIdentifier) {
+      if (!skillIdentifier) return;
+      const str = skillIdentifier.toString();
+      if (!this.globalVerifiedSkills.includes(str)) {
+        this.globalVerifiedSkills.push(str);
+      }
+      this.addCompletedSkill(str);
+    },
+
+    removeVerifiedSkill(skillIdentifier) {
+      if (!skillIdentifier) return;
+      const str = skillIdentifier.toString();
+      this.globalVerifiedSkills = this.globalVerifiedSkills.filter((s) => s !== str);
+    },
+
     async fetchProfile() {
       this.loading = true;
       this.error = null;
@@ -79,12 +102,19 @@ export const useUserStore = defineStore('user', {
           this.setDegreePreference(data.profile.education.degree);
         }
 
-        // Initialize global completed skills set from declared skills (level >= 3 or progress complete)
+        // Initialize global completed and verified skills sets from profile
         (data.skills || []).forEach((s) => {
-          if (s.level >= 3 && s.skill) {
-            if (s.skill._id) this.addCompletedSkill(s.skill._id);
-            if (s.skill.slug) this.addCompletedSkill(s.skill.slug);
-            if (s.skill.skillId) this.addCompletedSkill(s.skill.skillId);
+          if (s.skill) {
+            if (s.level >= 3) {
+              if (s.skill._id) this.addCompletedSkill(s.skill._id);
+              if (s.skill.slug) this.addCompletedSkill(s.skill.slug);
+              if (s.skill.skillId) this.addCompletedSkill(s.skill.skillId);
+            }
+            if (s.verified) {
+              if (s.skill._id) this.addVerifiedSkill(s.skill._id);
+              if (s.skill.slug) this.addVerifiedSkill(s.skill.slug);
+              if (s.skill.skillId) this.addVerifiedSkill(s.skill.skillId);
+            }
           }
         });
 

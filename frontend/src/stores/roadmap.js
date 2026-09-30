@@ -87,13 +87,18 @@ export const useRoadmapStore = defineStore('roadmap', {
         const { data } = await api.get(url);
         this.roadmap = data;
 
-        // Synchronize all completed skills into the global user completed skills set
+        // Synchronize all completed and verified skills into the global user sets
         const userStore = useUserStore();
         (data.nodes || []).forEach((n) => {
           if (n.status === 'completed') {
             userStore.addCompletedSkill(n.skillId);
             userStore.addCompletedSkill(n.slug);
             if (n.explicitSkillId) userStore.addCompletedSkill(n.explicitSkillId);
+          }
+          if (n.verified) {
+            userStore.addVerifiedSkill(n.skillId);
+            userStore.addVerifiedSkill(n.slug);
+            if (n.explicitSkillId) userStore.addVerifiedSkill(n.explicitSkillId);
           }
         });
 

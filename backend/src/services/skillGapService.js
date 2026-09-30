@@ -143,31 +143,43 @@ async function buildRoadmap(userId, careerId) {
     };
   });
 
-  // Evaluate prerequisites & lock status
+  // Evaluate prerequisites & lock status under Option B: Strict Verified Badge Enforcement
   const nodes = rawNodes.map((node) => {
-    const explicitPrereqs = (node.skillObj.prerequisites || []).map((p) => (p._id || p).toString());
+    const explicitPrereqIds = (node.skillObj.prerequisites || []).map((p) => (p._id ? p._id.toString() : p.toString()));
+    const explicitPrereqSlugs = (node.skillObj.prerequisites || []).map((p) => (p.slug ? p.slug : p.toString()));
+
+    // Find all prerequisite nodes that exist within the current roadmap
+    const prereqNodesInRoadmap = rawNodes.filter((n) =>
+      explicitPrereqIds.includes(n.skillId.toString()) ||
+      (n.slug && explicitPrereqSlugs.includes(n.slug))
+    );
 
     let unmet = [];
 
-    if (explicitPrereqs.length > 0) {
-      unmet = rawNodes.filter((n) => explicitPrereqs.includes(n.skillId.toString()) && n.status !== 'completed');
+    if (prereqNodesInRoadmap.length > 0) {
+      // STRICT: A prerequisite is ONLY satisfied if the user has earned the Verified Badge (verified === true)
+      unmet = prereqNodesInRoadmap.filter((n) => !n.verified);
     } else if (node.phaseId === 'core') {
+      // For Phase 2 skills with no explicit prerequisites in this track,
+      // require foundational Phase 1 skills to have earned Verified Badges
       const phase1Nodes = rawNodes.filter((n) => n.phaseId === 'foundations');
-      const hasCompletedFoundation = phase1Nodes.some((n) => n.status === 'completed');
-      if (!hasCompletedFoundation && phase1Nodes.length > 0) {
-        unmet = phase1Nodes.filter((n) => n.status !== 'completed');
+      const unverifiedFoundations = phase1Nodes.filter((n) => !n.verified);
+      if (unverifiedFoundations.length > 0) {
+        unmet = unverifiedFoundations;
       }
     } else if (node.phaseId === 'advanced') {
+      // For Phase 3 skills with no explicit prerequisites in this track,
+      // require core Phase 2 skills to have earned Verified Badges
       const phase2Nodes = rawNodes.filter((n) => n.phaseId === 'core');
-      const hasCompletedCore = phase2Nodes.some((n) => n.status === 'completed');
-      if (!hasCompletedCore && phase2Nodes.length > 0) {
-        unmet = phase2Nodes.filter((n) => n.status !== 'completed');
+      const unverifiedCore = phase2Nodes.filter((n) => !n.verified);
+      if (unverifiedCore.length > 0) {
+        unmet = unverifiedCore;
       }
     }
 
-    const isLocked = unmet.length > 0 && node.status !== 'completed';
+    const isLocked = unmet.length > 0 && !node.verified;
     const lockedReason = isLocked
-      ? `Requires completing: ${unmet.map((u) => u.name).slice(0, 2).join(', ')}`
+      ? `Requires Verified Badge in: ${unmet.map((u) => u.name).join(', ')}`
       : '';
 
     // Remove internal reference
@@ -238,15 +250,22 @@ async function buildRoadmap(userId, careerId) {
 }
 
 /**
- * Dynamically computes phase locks by verifying that all skills/prerequisites
- * from the preceding phase are marked complete.
+ * Dynamically computes phase locks under Strict Verified Badge Enforcement:
+ * 1. Phase 1 (Foundations) is always unlocked at the phase level.
+ * 2. Phase 2 (or any subsequent phase) is unlocked / accessible if at least one of its
+ *    skills has all prerequisites verified, OR if the preceding phase is 100% verified.
+ * 3. Individual skill nodes remain STRICTLY locked if any of their prerequisites
+ *    lack the Verified Badge.
+ *
+ * Example (AI/ML Engineer):
+ * Earning Verified Badges in Python & SQL unlocks Phase 2, but ONLY Data Analysis unlocks.
+ * Machine Learning and Deep Learning remain locked because their prerequisites
+ * (Math & Statistics, Machine Learning) lack Verified Badges.
  */
 function computeUnlockedPhases(roadmap) {
   if (!roadmap || !roadmap.phases || !roadmap.nodes) return roadmap;
 
   const phases = roadmap.phases;
-  let precedingPhaseComplete = true;
-  let precedingPhaseTitle = '';
 
   for (let i = 0; i < phases.length; i++) {
     const phase = phases[i];
@@ -258,32 +277,35 @@ function computeUnlockedPhases(roadmap) {
       phase.lockedReason = '';
     } else {
       const prevPhase = phases[i - 1];
-      const incompletePrevNodes = prevPhase.nodes.filter((n) => n.status !== 'completed');
+      const unverifiedPrevNodes = prevPhase.nodes.filter((n) => !n.verified);
+      const isPrecedingPhaseFullyVerified = unverifiedPrevNodes.length === 0;
 
-      if (!precedingPhaseComplete || incompletePrevNodes.length > 0) {
+      // Has any skill in this phase had all its prerequisite badges earned?
+      const hasAnyUnlockedSkill = phase.nodes.some((n) => !n.isLocked || n.verified);
+
+      if (!hasAnyUnlockedSkill && !isPrecedingPhaseFullyVerified) {
+        // Entire phase is locked because no skills in this phase have prerequisites verified
         phase.isLocked = true;
         phase.unlocked = false;
-        phase.lockedReason = `Complete all skills in ${prevPhase.title} to unlock this phase (${incompletePrevNodes.length} remaining)`;
-        precedingPhaseComplete = false;
-        precedingPhaseTitle = prevPhase.title;
+        phase.lockedReason = `Earn Verified Badges in ${prevPhase.title} to unlock this phase (${unverifiedPrevNodes.length} remaining)`;
       } else {
+        // Phase is unlocked and accessible!
         phase.isLocked = false;
         phase.unlocked = true;
         phase.lockedReason = '';
       }
     }
 
-    // Apply phase lock to each skill node within this phase
+    // Apply strict prerequisite locking to each skill node within this phase
     phase.nodes.forEach((node) => {
       if (phase.isLocked) {
         node.isLocked = true;
-        node.lockedReason = `Locked: Complete all skills in ${precedingPhaseTitle || phases[i - 1]?.title} first`;
+        node.lockedReason = node.lockedReason || `Locked: Earn Verified Badges in ${phases[i - 1]?.title} first`;
       } else {
-        // Phase is unlocked, check individual prerequisite skills
-        const unmetExplicit = node.unmetPrerequisites || [];
-        if (unmetExplicit.length > 0 && node.status !== 'completed') {
+        // Phase is unlocked: check if this individual skill has any unverified prerequisites
+        if (node.unmetPrerequisites && node.unmetPrerequisites.length > 0 && !node.verified) {
           node.isLocked = true;
-          node.lockedReason = `Requires completing: ${unmetExplicit.map((u) => u.name).slice(0, 2).join(', ')}`;
+          node.lockedReason = `Requires Verified Badge in: ${node.unmetPrerequisites.map((u) => u.name).join(', ')}`;
         } else {
           node.isLocked = false;
           node.lockedReason = '';
@@ -297,17 +319,19 @@ function computeUnlockedPhases(roadmap) {
       if (masterNode) {
         masterNode.isLocked = node.isLocked;
         masterNode.lockedReason = node.lockedReason;
+        masterNode.unmetPrerequisites = node.unmetPrerequisites;
       }
     });
 
     // Recompute phase statistics
-    phase.completedCount = phase.nodes.filter((n) => n.status === 'completed').length;
+    phase.completedCount = phase.nodes.filter((n) => n.status === 'completed' || n.verified).length;
+    phase.verifiedCount = phase.nodes.filter((n) => n.verified).length;
     phase.totalCount = phase.nodes.length;
     phase.percent = phase.totalCount ? Math.round((phase.completedCount / phase.totalCount) * 100) : 0;
   }
 
-  // Next recommended skill is the first unlocked node not yet completed
-  roadmap.recommended = roadmap.nodes.find((n) => !n.isLocked && n.status !== 'completed') || null;
+  // Next recommended skill is the first unlocked node not yet completed or verified
+  roadmap.recommended = roadmap.nodes.find((n) => !n.isLocked && n.status !== 'completed' && !n.verified) || null;
 
   return roadmap;
 }
